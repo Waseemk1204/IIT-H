@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Maggie ke liye kuch bhi — Game Proposal</title>
+<style>
+  @page { size: A4; margin: 14mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 9.8pt; line-height: 1.34; color: #1b1b1b; margin: 0; }
+  h1 { font-family: "Arial Black", "Helvetica Neue", sans-serif; font-size: 20pt; margin: 0; white-space: nowrap; letter-spacing: .5px; line-height: 1; }
+  h1 span { color: #e8a400; }
+  .tag { font-size: 11pt; font-style: italic; margin: 4px 0 0; color: #444; }
+  h2 { font-size: 11.5pt; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px; padding-bottom: 2px; border-bottom: 2px solid #1b1b1b; }
+  p { margin: 0 0 6px; }
+  ul { margin: 0 0 6px; padding-left: 16px; }
+  li { margin-bottom: 2px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 4px solid #1b1b1b; padding-bottom: 8px; }
+  .meta { text-align: right; white-space: nowrap; margin-left: 12px; font-size: 9pt; color: #444; }
+  .themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0; }
+  .theme { border: 2px solid #1b1b1b; border-radius: 6px; padding: 6px 8px; box-shadow: 3px 3px 0 #1b1b1b; }
+  .theme b.t { display: block; font-family: "Arial Black", sans-serif; font-size: 11pt; margin-bottom: 2px; }
+  .theme.light { background: #fff6d6; } .theme.comic { background: #ffe1e1; } .theme.twist { background: #e1efff; }
+  .bubble { border: 2px solid #1b1b1b; border-radius: 14px; padding: 6px 10px; background: #fff; font-style: italic; margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.4pt; margin: 4px 0 6px; }
+  th, td { border: 1px solid #999; padding: 3px 6px; text-align: left; vertical-align: top; }
+  th { background: #eee; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .page2 { break-before: page; }
+  .small { font-size: 9pt; color: #444; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div>
+    <h1>MAGGIE KE LIYE KUCH BHI<span>!</span></h1>
+    <p class="tag">A comic jugaad stealth game: one power cut, one strict warden, one plate of Maggi.</p>
+  </div>
+  <div class="meta">Game proposal · IIT-H Game Jam<br>Themes: <b>Comic · Twist · Light</b><br>Platform: web browser (desktop + phone)</div>
+</div>
+
+<h2>The pitch</h2>
+<p>It is 1:30 AM, the night before the Endsem. The hostel is under curfew, the main gate has been chained shut
+since 11, and you have not eaten since lunch. Then the whole block goes dark: <b>load-shedding</b>. Somewhere
+outside the gate, Bhaiya's night canteen is still boiling Maggi, and it closes at 3. Sneak out of your room, down
+the wing, past the warden's torch and through the gate using nothing but what a hostel has lying around. Don't get caught.</p>
+<div class="bubble">"Kaun hai wahan?! Lights off ka matlab sona hai, ghoomna nahi!" — Warden Saab, every night</div>
+
+<h2>How it hits all three themes</h2>
+<div class="themes">
+  <div class="theme light"><b class="t">LIGHT</b>The darkness is your cover. The warden's torch beam is his line of sight, and you can see it sweep the corridor.
+    Your own light sources (a phone torch, the glow of a mosquito bat, a laptop screen) let you search and pick locks, but they give you away too.
+    The game is also light-hearted: nobody gets hurt and the worst punishment is embarrassment.</div>
+  <div class="theme comic"><b class="t">COMIC</b>Toon-shaded 3D with thick ink outlines. Sound-effect bubbles pop up in the world
+    ("KHATAK!", "DHADAAM!", "SLURRRP"), speech bubbles over characters, and comic-panel cutscenes.
+    Every character is a hostel stereotype: the warden, the sleeping chowkidar, the topper who never sleeps,
+    the senior who "knows a shortcut".</div>
+  <div class="theme twist"><b class="t">TWIST</b>Halfway through the night, <b>the power comes back</b>. Tube lights flood every
+    corridor and the rules flip: darkness no longer hides you, so you have to hide in plain sight among students cramming in the
+    corridors, or jugaad the power off again. The final twist: you reach the canteen and the warden is already there,
+    eating Maggi.</div>
+</div>
+
+<h2>Core loop</h2>
+<ul>
+  <li><b>Explore in the dark.</b> First-person movement with crouch, a run that makes noise, and searching cupboards, bags, bathrooms and the common room.</li>
+  <li><b>Collect and combine jugaad.</b> Items have properties, not jobs. A bobby pin and a geometry-box compass make a lock pick.
+    A charger cable lowers keys from a balcony. A bucket and mug are a noise trap. Every lock can be beaten at least two ways.</li>
+  <li><b>Avoid the warden.</b> He patrols with a torch and listens for noise. His beam fills a "spotted" meter.
+    If it fills, you are marched back to your room and he takes whatever you were holding.</li>
+  <li><b>Create distractions.</b> Set a phone alarm in someone else's room, ring the corridor bell, or knock over a cycle in the parking lot.</li>
+  <li><b>Score it.</b> The end card lists every jugaad you used and gives you a Jugaad Score and a title ("Maggi Mastermind",
+    "Curfew Ka Baap"). Improvised answers score more than keys, and keys score more than brute force.</li>
+</ul>
+
+<h2>The route out</h2>
+<table>
+  <tr><th>Obstacle</th><th>Some of the jugaad ways</th></tr>
+  <tr><td>Your room (roommate locked it from outside "for your own good")</td><td>Slide a newspaper under the door and push the key out of the lock, or reach the latch through the vent with a hanger</td></tr>
+  <tr><td>Wing grill gate (padlock)</td><td>Bobby pin + compass pick, or the spare key in the warden's key box (the code is on a sticky note in his diary)</td></tr>
+  <tr><td>Main gate (chain + chowkidar asleep holding the keys)</td><td>Hook the keys off his belt with a hanger and a ruler, or cut through the canteen backyard via a broken wall (loud)</td></tr>
+</table>
+
+<!-- ================= PAGE 2 ================= -->
+<div class="page2"></div>
+
+<h2>The twist, in detail</h2>
+<p><b>Act 1 — Andhera (dark):</b> stealth in darkness. The warden's torch is the only threat, and light is your
+risk as well as your tool. <b>Act 2 — Bijli Aa Gayi (power's back):</b> it triggers when you open the wing gate. Lights come on everywhere,
+twenty students come out to study, and the warden can now see the whole corridor. You can either <i>hide in plain sight</i>
+(pick up a textbook, sit with a group-study circle, act like you're cramming while he walks past) or <i>bring the darkness back</i>
+by plugging an electric kettle, an iron and a room heater into one extension board until the fuse trips. That's loud and gets the whole
+block shouting at you. <b>Ending:</b> you reach the canteen and the warden is sitting there with a plate of Maggi. He looks up, then
+pushes a second plate towards you: <i>"Paper kal hai na? Jaldi kha, phir so ja."</i></p>
+
+<div class="two">
+<div>
+<h2>Scope (what I will ship)</h2>
+<ul>
+  <li>One hostel block: rooms, a wing corridor, the common room, washrooms, stairs, the gate and the canteen.</li>
+  <li>One warden AI (patrol, torch cone, hearing, search), plus the sleeping chowkidar and study-circle NPCs.</li>
+  <li>About 15 jugaad items, 3 locked obstacles with 2 or more solutions each, and 4 distractions.</li>
+  <li>Both acts with the power-flip twist, an opening and ending as comic-panel cutscenes, and the score card.</li>
+  <li>Keyboard and mouse plus touch controls, playable in the browser with no install.</li>
+</ul>
+<p class="small"><b>Stretch goals:</b> random item placement per run, a second warden route, Hindi/English toggle for the dialogue.</p>
+</div>
+<div>
+<h2>Tech &amp; art</h2>
+<ul>
+  <li><b>Engine:</b> plain JavaScript + Three.js, a static site with no build step, deployed on Vercel.</li>
+  <li><b>Look:</b> low-poly toon shading with an outline pass, high-contrast lighting (one torch beam in the dark),
+    and comic halftone overlays.</li>
+  <li><b>Audio:</b> synthesized footsteps, ceiling fans, a generator hum and the warden's muttering, with
+    sound-effect bubbles shown alongside each sound.</li>
+  <li><b>Testing:</b> the warden AI and the lock rules are pure functions with automated tests, so every lock always has a working
+    solution.</li>
+</ul>
+</div>
+</div>
+
+<h2>Plan</h2>
+<table>
+  <tr><th>Phase</th><th>Work</th></tr>
+  <tr><td>Phase 1</td><td>Hostel layout and collision, movement, darkness and torch lighting, warden patrol and sight cone</td></tr>
+  <tr><td>Phase 2</td><td>Items, inventory and combining, the three obstacles, distractions, spotted meter and getting caught</td></tr>
+  <tr><td>Phase 3</td><td>The Act 2 power-flip, hide-in-plain-sight, fuse trip, cutscenes, comic sound-effect bubbles, audio</td></tr>
+  <tr><td>Phase 4</td><td>Phone controls, playtesting and balancing, score card, polish, deploy</td></tr>
+</table>
+
+<h2>Built from scratch · AI use disclosure</h2>
+<p><b>All game code will be written from scratch during the jam</b>, with no code reused from earlier projects. The only third-party code is the
+open-source Three.js library. All 3D models, sounds and art will be made during the jam.</p>
+<p><b>AI disclosure:</b> I used Claude (Anthropic) to help brainstorm the concept and to draft and lay out this proposal.
+During development I will use Claude Code as a coding assistant. I review and test everything it produces, and I am responsible for it.
+The README will keep an up-to-date log of where AI was used (code, art, audio, writing).</p>
+
+<h2>Team (solo)</h2>
+<table>
+  <tr><th>Name</th><th>Email</th><th>IndieConnect ID</th><th>Role</th></tr>
+  <tr><td>Mohammad Waseem Khan</td><td>Waseemk1204@gmail.com</td><td>@waseemk1204<br><span class="small">indieconnect.in/@waseemk1204</span></td><td>Everything: design, code, art, audio</td></tr>
+</table>
+
+</body>
+</html>
