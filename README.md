@@ -54,8 +54,23 @@ caught and whatever you are holding goes into the warden's almirah (you can stea
 Reach the Maggi stall for the score card: improvised answers beat sneaky ones, which beat
 keys, which beat brute force.
 
-Next: Phase 3 (the power-comes-back twist, cutscenes, audio polish), Phase 4 (phone
-controls, score card polish).
+**Phase 3 (done):** the twist. Get through the grill gate and the power comes back: tube
+lights stutter on, fans spin up, the whole block cheers, and students pour into the corridor
+and lobby to cram in study circles. Darkness no longer hides you; Warden Saab puts his torch
+away and sees anything in front of him. Two answers:
+
+- **Hide in plain sight:** borrow a book from a study circle and sit down to cram. He walks
+  right past ("Shabash! Aise hi padhai karo sab.").
+- **Bring the darkness back:** plug the kettle (common room), the press (lobby almirah) and
+  his own heater (his desk) into the common-room extension board. PHATAAK! The fuse blows,
+  the block groans, and he goes to his room to fix the MCB, which gives you a window of dark.
+
+Comic-page cutscenes open and close the game, drawn by the engine itself. The ending has one
+last twist at the Maggi stall. Audio: mains hum and fans when the power is on, a murmuring
+crowd, the fuse blowing, and a dhol-and-tabla loop that gets busier when he is suspicious
+and frantic when he is chasing you.
+
+Next: Phase 4 (phone controls, playtesting and balancing, score card polish).
 
 ## How it is built
 
@@ -66,6 +81,8 @@ controls, score card polish).
 | `shared/jugaad.js` | Items, recipes, loot, every way through each lock, distractions, chowkidar, score (pure logic; tested) |
 | `src/interact.js` | What you are looking at, and where a thrown thing lands |
 | `src/render/chowkidar.js`, `src/render/items.js` | The chowkidar; items drawn as comic stickers |
+| `src/render/students.js` | Act 2's students cramming in study circles |
+| `src/cutscenes.js` | Comic-page cutscenes built from engine-rendered panels |
 | `src/main.js` | Renderer, the game loop, and the glue between player, warden and HUD |
 | `src/player.js` | First-person movement, crouch, run, footstep noise |
 | `src/render/world.js` | Builds the hostel in 3D from the grid |
@@ -82,3 +99,4 @@ controls, score card polish).
 | 2 Oct 2026 | Claude (Anthropic) | Brainstorming the concept, drafting and laying out the proposal |
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 1 code: map and collision, line of sight and path finding, warden AI, 3D hostel and warden models, toon rendering, HUD, synthesised audio, tests. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 2 code: jugaad rules (items, recipes, locks, distractions, chowkidar, score), inventory and interaction, chowkidar model, item stickers, window and radio, score card, tests. |
+| 3 Oct 2026 | Claude Code (Anthropic) | Phase 3 code: Act 2 power-flip (lights, fans, students, warden sight with lights on), study-circle hiding, extension-board fuse trip and the warden's repair errand, opening and ending comic cutscenes rendered in-engine, power/crowd/fuse sounds and dhol tension music, tests. |

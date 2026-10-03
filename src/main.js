@@ -2,11 +2,14 @@
 // Warden Saab, the jugaad rules and the screen.
 import * as THREE from 'three';
 import { createMap, WARDEN_START, WARDEN_ROUTE, areaName } from '../shared/map.js';
-import { createWarden, updateWarden, resumePatrol } from '../shared/warden-ai.js';
+import { createWarden, updateWarden, resumePatrol, sendWarden } from '../shared/warden-ai.js';
 import {
   ITEMS, MY_DOOR, CANTEEN, createJugaad, actionsFor, perform, lockedHint, combine, recipeFor,
   selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateHeld, tailgated, score,
+  startAct2, restorePower, STUDY_CIRCLES, FUSE_BOX,
 } from '../shared/jugaad.js';
+import { createStudents } from './render/students.js';
+import { playComic } from './cutscenes.js';
 import { buildWorld } from './render/world.js';
 import { createWardenModel } from './render/warden.js';
 import { createChowkidarModel } from './render/chowkidar.js';
@@ -45,7 +48,21 @@ const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 60);
 scene.add(camera);
 
 // Moonlight leaking in: just enough to make out shapes.
-scene.add(new THREE.HemisphereLight(0x6f80b8, 0x221f28, 1.15));
+const hemi = new THREE.HemisphereLight(0x6f80b8, 0x221f28, 1.15);
+scene.add(hemi);
+const DARK = { sky: new THREE.Color(0x6f80b8), ground: new THREE.Color(0x221f28), i: 1.15, fog: 24 };
+const LIT = { sky: new THREE.Color(0xf4f2ea), ground: new THREE.Color(0x5d574e), i: 2.1, fog: 55 };
+// Light the scene for a power level between 0 (dark) and 1 (tube lights on).
+function applyPower(p) {
+  hemi.color.copy(DARK.sky).lerp(LIT.sky, p);
+  hemi.groundColor.copy(DARK.ground).lerp(LIT.ground, p);
+  hemi.intensity = DARK.i + (LIT.i - DARK.i) * p;
+  scene.fog.far = DARK.fog + (LIT.fog - DARK.fog) * p;
+}
+// Only used for the opening comic: your room with its light on.
+const roomLamp = new THREE.PointLight(0xfff1d6, 0, 7, 1.3);
+roomLamp.position.set(2.5, 2.6, 10.5);
+scene.add(roomLamp);
 
 const map = createMap();
 const jug = createJugaad(map);
@@ -58,6 +75,21 @@ scene.add(wardenModel.group);
 const chowModel = createChowkidarModel();
 scene.add(chowModel.group);
 const worldItems = createWorldItems(scene);
+const students = createStudents(scene, STUDY_CIRCLES);
+// A second Warden Saab, for the ending: standing at the Maggi stall.
+const cutWarden = createWardenModel();
+cutWarden.group.visible = false;
+cutWarden.setTorch(false);
+scene.add(cutWarden.group);
+const bowls = [];
+for (const x of [36.15, 35.5]) {
+  const b = new THREE.Group();
+  b.add(inkBox(0.26, 0.1, 0.26, 0xf2f2ee, 0, 0, 0, 0.01));
+  b.add(inkBox(0.22, 0.05, 0.22, 0xf0c33c, 0, 0.08, 0, 0.006));   // Maggi
+  b.position.set(x, 0.95, 18.3);
+  b.visible = false;
+  scene.add(b); bowls.push(b);
+}
 
 const player = createPlayer(map.spawn);
 const input = createInput(canvas);
@@ -102,6 +134,7 @@ let time = 0;
 let hold = null;              // { key, action, target, t, noiseT }
 let holdLatch = false;        // E must be released before the next action
 let prevX = player.x;
+let wasSeated = false;
 
 let sizeW = 0, sizeH = 0;
 function resize() {
@@ -122,7 +155,13 @@ function startPlaying() {
   state = 'playing';
   showOverlay(null);
 }
-document.getElementById('start').addEventListener('click', startPlaying);
+let introDone = false;
+document.getElementById('start').addEventListener('click', async () => {
+  sfx.startAudio();
+  if (!introDone && !window.__skipComics) await playComic(openingPanels(), { title: 'Raat 1:29 baje...' });
+  introDone = true;
+  startPlaying();
+});
 document.getElementById('resume').addEventListener('click', startPlaying);
 document.getElementById('again').addEventListener('click', () => location.reload());
 document.addEventListener('pointerlockchange', () => {
@@ -148,6 +187,8 @@ function getCaught() {
   caughtReady = false;
   hold = null;
   sfx.sting('caught');
+  jug.seated = null;
+  sfx.setTension(0);
   const taken = confiscateHeld(jug);
   document.getElementById('caught-line').textContent = `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
   document.getElementById('caught-taken').textContent = taken
@@ -170,10 +211,14 @@ function backToRoom() {
   startPlaying();
 }
 
-function win() {
-  state = 'won';
+async function win() {
+  state = 'ending';
   hold = null;
+  jug.seated = null;
   document.exitPointerLock?.();
+  sfx.setTension(0);
+  if (!window.__skipComics) await playComic(endingPanels(), { title: 'Maggi Point, raat 2 baje ke baad...' });
+  state = 'won';
   const s = score(jug, caughtCount);
   const list = document.getElementById('score-lines');
   list.innerHTML = '';
@@ -218,8 +263,36 @@ function handle(events, noises) {
     } else if (e.type === 'say') {
       if (e.who === 'warden') { hud.say(e.line, wardenHead, 'alert'); wardenModel.setMood('angry'); }
       else if (e.who === 'chowkidar') hud.say(e.line, chowHead, /CHOR/.test(e.line) ? 'angry' : '', 'Chowkidar');
+      else if (e.who === 'student') hud.say(e.line, v3(e.x, 1.2, e.z), '', 'Student');
       else hud.say(e.line, v3(e.x, 2.1, e.z), 'angry', 'Kamre se awaaz');
+    } else if (e.type === 'power') powerChanged(e);
+  }
+}
+
+// ---- Act 2: the power comes back (and goes again when you blow the fuse)
+function powerChanged(e) {
+  world.setPower(e.on, e.on);
+  sfx.setPower(e.on);
+  warden.lightsOn = e.on;
+  wardenModel.setTorch(!e.on);
+  if (e.on) {
+    sfx.tubeTinks();
+    sfx.cheer();
+    students.show(true);
+    if (e.first) {
+      hud.bigPop('BIJLI AA GAYI!');
+      hud.subtitle('Bijli wapas! Sab padhne baith gaye... aur ab Warden Saab ko sab dikhta hai. Study circle mein chhupo, ya... bijli phir se udaao?', 6);
+      hud.say('Bijli aa gayi! Chalo sab, PADHAI KARO!', wardenHead, 'alert');
+    } else {
+      hud.say('Ho gaya theek. Ab koi haath mat lagana!', wardenHead, 'alert');
     }
+  } else {
+    sfx.fuseBlow();
+    sfx.groan();
+    hud.bigPop('PHATAAK!');
+    hud.subtitle('Fuse ud gaya! Andhera wapas. Warden Saab MCB theek karne gaye...', 4);
+    hud.say('Abey! Fuse kisne udaaya?!', wardenHead, 'angry');
+    sendWarden(warden, FUSE_BOX.x, FUSE_BOX.z, 7, 'fuse');
   }
 }
 
@@ -272,7 +345,9 @@ function inventoryKeys() {
 
 // ---- E: look, act, hold
 function interact(dt, noises) {
-  const target = findTarget(player, jug);
+  const target = jug.seated
+    ? { type: 'circle', circle: jug.seated, dist: 0.5, at: jug.seated.seat, key: `circle:${jug.seated.id}` }
+    : findTarget(player, jug);
   let actions = target ? actionsFor(jug, target, { dist: target.dist, inside: target.inside, crouch: player.crouch }) : [];
   if (target && target.type === 'door' && target.door.kind === 'D' && actions[0]?.id === 'toggle' && target.door.open && playerInDoor(target.door)) {
     actions = [];
@@ -320,6 +395,72 @@ function playerInDoor(door) {
   return Math.hypot(player.x - px, player.z - pz) < RADIUS + 0.02;
 }
 
+// ---- comic panels, rendered by the engine
+function shot({ pos, at, power = 0, lamp = 0, fov = 55, setup }) {
+  const keep = { power: world.power, target: world.target, flicker: world.flicker, fov: camera.fov, aspect: camera.aspect, lamp: roomLamp.intensity };
+  const camPos = camera.position.clone(), camQ = camera.quaternion.clone();
+  const vis = { phone: phone.visible, held: heldSprite?.visible, warden: wardenModel.group.visible };
+  world.power = world.target = power; world.flicker = 0;
+  world.update(0);
+  applyPower(power);
+  roomLamp.intensity = lamp;
+  phone.visible = false; if (heldSprite) heldSprite.visible = false;
+  setup?.();
+  camera.position.set(...pos); camera.lookAt(...at);
+  camera.fov = fov; camera.aspect = 4 / 3; camera.updateProjectionMatrix();
+  renderer.setSize(960, 720, false);
+  renderer.render(scene, camera);
+  const url = canvas.toDataURL('image/jpeg', 0.86);
+  Object.assign(world, { power: keep.power, target: keep.target, flicker: keep.flicker });
+  world.update(0);
+  applyPower(keep.power);
+  roomLamp.intensity = keep.lamp;
+  phone.visible = vis.phone; if (heldSprite) heldSprite.visible = vis.held;
+  wardenModel.group.visible = vis.warden;
+  camera.position.copy(camPos); camera.quaternion.copy(camQ);
+  camera.fov = keep.fov; camera.aspect = keep.aspect; camera.updateProjectionMatrix();
+  renderer.setSize(sizeW, sizeH, false);
+  return url;
+}
+
+function openingPanels() {
+  const desk = shot({ pos: [3.9, 1.45, 11.9], at: [1.3, 0.75, 9.3], power: 1, lamp: 6 });
+  const bed = shot({ pos: [3.7, 2.3, 9.4], at: [1.6, 0.4, 12.0], power: 1, lamp: 6 });
+  const door = shot({ pos: [2.5, 1.5, 11.3], at: [2.5, 1.3, 8.2], power: 1, lamp: 6 });
+  const dark = shot({ pos: [3.9, 1.45, 11.9], at: [1.3, 0.75, 9.3], power: 0, lamp: 0.25 });
+  return [
+    { img: desk, caption: '1:29 AM. Endsem kal hai. Room 106.', bubbles: [{ text: 'Bas ek chapter aur...', x: 52, y: 22 }] },
+    { img: bed, caption: '...aur pet mein chuhe daud rahe hain.', sfx: { text: 'GRRRRRR', x: 30, y: 45 }, bubbles: [{ text: "Bhaiya ki Maggi... 3 baje tak khuli hai...", x: 50, y: 20 }] },
+    { img: door, caption: 'Roommate, darwaze ke bahar se:', sfx: { text: 'KLIK!', x: 62, y: 58, rot: 10 }, bubbles: [{ text: 'Tu padh! Main 109 mein so raha hoon. Tere bhale ke liye BAHAR se lock kar raha hoon!', x: 10, y: 14, shout: true }] },
+    { img: dark, dim: true, caption: 'Aur phir...', sfx: { text: 'BIJLI GAYI!', x: 18, y: 38, rot: -6 }, bubbles: [{ text: '...ab toh Maggi ke liye KUCH BHI.', x: 48, y: 70 }] },
+  ];
+}
+
+function endingPanels() {
+  const lanternWas = world.lantern.intensity;
+  const pose = (look, pushed) => () => {
+    world.lantern.intensity = 4.5;
+    wardenModel.group.visible = false;
+    cutWarden.group.visible = true;
+    cutWarden.update({ x: 36.15, z: 17.6, yaw: 0, lookOffset: look, moving: false, mode: 'patrol', meter: 0 }, 0);
+    bowls.forEach((b) => { b.visible = true; });
+    bowls[1].position.set(pushed ? 35.2 : 35.5, 0.95, pushed ? 18.15 : 18.35);
+  };
+  const p1 = shot({ pos: [36.0, 1.65, 14.4], at: [36, 1.3, 18.3], setup: pose(0, false) });
+  const p2 = shot({ pos: [33.9, 1.55, 16.4], at: [36.1, 1.2, 18.0], fov: 50, setup: pose(0, false) });
+  const p3 = shot({ pos: [35.0, 1.55, 16.2], at: [36.1, 1.55, 17.6], fov: 40, setup: pose(-2, false) });
+  const p4 = shot({ pos: [34.8, 1.6, 16.6], at: [35.7, 1.15, 17.9], fov: 50, setup: pose(-1.6, true) });
+  cutWarden.group.visible = false;
+  bowls.forEach((b) => { b.visible = false; });
+  world.lantern.intensity = lanternWas;
+  return [
+    { img: p1, caption: 'Maggi Point. Finally.', bubbles: [{ text: 'Bhaiya! Ek plate Maggi, DOUBLE masala!', x: 8, y: 14, shout: true }] },
+    { img: p2, caption: 'Counter pe pehle se koi khada hai...', sfx: { text: 'SLURRRRP', x: 50, y: 30, rot: -10 } },
+    { img: p3, caption: 'Woh. Yahan. Bhi.', bubbles: [{ text: '.....', x: 56, y: 12 }] },
+    { img: p4, caption: 'Warden Saab ne plate aage sarkaayi.', bubbles: [{ text: 'Paper kal hai na? Jaldi kha, phir so ja.', x: 30, y: 10 }] },
+  ];
+}
+
 // ---- the loop
 let lastT = performance.now();
 function frame() {
@@ -336,7 +477,19 @@ function tick(dt) {
 
   if (state === 'playing') {
     const torchWas = player.torch;
+    // Sitting in a study circle: any step gets you up.
+    if (jug.seated && input.held('KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight')) {
+      jug.seated = null;
+      player.crouch = false;
+    }
     const noises = updatePlayer(player, dt, input, map);
+    if (jug.seated) {
+      if (!wasSeated) { player.yaw = jug.seated.yaw; player.pitch = -0.3; }
+      player.x = jug.seated.seat.x; player.z = jug.seated.seat.z;
+      player.crouch = true;
+    }
+    wasSeated = !!jug.seated;
+    player.hidden = !!jug.seated && jug.inv.includes('book');
     if (player.torch && !jug.inv.includes('phone')) {
       player.torch = false;
       if (!torchWas) hud.subtitle('Phone hi nahi hai! Torch kaise jalaoge?', 2);
@@ -355,6 +508,7 @@ function tick(dt) {
     if (prevX < 25 && prevX > 24 && player.x >= 25 && player.z > 6 && player.z < 8 && grill.locked) tailgated(jug);
     prevX = player.x;
 
+    if (jug.solved.grill && jug.act === 1) handle(startAct2(jug), noises);
     handle(updateJugaad(jug, dt, { player, warden }), noises);
     chowkidarHears(jug, noises);
 
@@ -370,10 +524,15 @@ function tick(dt) {
         const pos = v3(x + 0.5, 1.4, z + 0.5);
         if (e.door.kind === 'D') { sfx.doorCreak(ear.dist, ear.pan); hud.sfx('CHURRR', pos, 0.8); }
         else { sfx.gateClang(ear.dist, ear.pan); hud.sfx(e.closed ? 'KHATAK!' : 'KHAT-KHAT!', pos, 1); }
+      } else if (e.type === 'errandDone' && e.tag === 'fuse') {
+        handle(restorePower(jug), noises);
       } else if (e.type === 'caught') {
         getCaught();
       }
     }
+    sfx.setTension(warden.mode === 'chase' ? 2 : warden.meter > 0.15 || ['suspicious', 'investigate', 'search'].includes(warden.mode) ? 1 : 0);
+    const mumble = students.update(dt, player);
+    if (mumble) hud.sfx(mumble.text, v3(mumble.x, 1.3, mumble.z), 0.45, 2);
 
     // His chappals, heard (and seen, comic-style) through the walls.
     if (warden.moving) {
@@ -411,6 +570,8 @@ function tick(dt) {
   phone.position.y = -0.2 + (player.moving ? Math.abs(Math.cos(player.bob)) * 0.012 : 0);
   showHeld(selected(jug));
 
+  applyPower(world.power);
+  world.setPlugged(jug.plugged.length);
   wardenModel.update(warden, dt);
   chowModel.update(jug.chowkidar, dt);
   worldItems.update(dt, jug.worldItems, time);

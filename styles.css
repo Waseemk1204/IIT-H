@@ -182,3 +182,42 @@ h2 { font-family: var(--comic); font-weight: 400; font-size: 44px; margin: 0 0 8
 .total { font-family: var(--comic); font-size: 30px; letter-spacing: 2px; margin: 6px 0; }
 .title-card { font-size: 18px; margin: 0 0 12px; }
 .title-card b { font-family: var(--comic); font-weight: 400; font-size: 28px; letter-spacing: 1px; color: var(--red); }
+
+/* ---------- Phase 3: comic-page cutscenes ---------- */
+#comic { background: #1a1612; align-items: start; overflow: auto; }
+.comic-page {
+  width: min(1100px, 100%); margin: auto; padding: 14px; background: var(--paper);
+  border: 5px solid var(--ink); box-shadow: 10px 10px 0 #000;
+}
+#comic-title { font-family: var(--comic); font-weight: 400; font-size: 28px; letter-spacing: 2px; color: var(--ink); margin: 0 0 10px; }
+#comic-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { #comic-panels { grid-template-columns: 1fr; } }
+.cpanel {
+  position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #000;
+  border: 4px solid var(--ink); opacity: 0; transform: scale(.94) rotate(-.6deg); transition: opacity .35s, transform .35s;
+}
+.cpanel:nth-child(even) { transform: scale(.94) rotate(.6deg); }
+.cpanel.on { opacity: 1; transform: none; }
+.cpanel img { width: 100%; height: 100%; object-fit: cover; display: block; filter: contrast(1.08) saturate(1.1); }
+.cpanel .cap {
+  position: absolute; top: 0; left: 0; max-width: 70%; background: var(--yellow); color: var(--ink);
+  border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); padding: 4px 10px;
+  font-family: var(--comic); font-size: clamp(14px, 1.8vw, 20px); letter-spacing: 1px;
+}
+.cbub {
+  position: absolute; max-width: 58%; background: #fff; color: var(--ink); border: 3px solid var(--ink); border-radius: 18px;
+  padding: 6px 12px; font-family: var(--comic); font-size: clamp(14px, 1.9vw, 21px); letter-spacing: .5px; line-height: 1.15;
+  box-shadow: 3px 3px 0 var(--ink); opacity: 0; transition: opacity .3s .35s;
+}
+.cbub::after { content: ''; position: absolute; left: 24px; bottom: -14px; border: 8px solid transparent; border-top: 10px solid var(--ink); }
+.cbub.shout { border-radius: 4px; background: #fff7c2; }
+.cpanel.on .cbub { opacity: 1; }
+.csfx {
+  position: absolute; font-family: var(--comic); font-size: clamp(30px, 5vw, 60px); letter-spacing: 2px; color: var(--yellow);
+  -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 5px 5px 0 var(--ink);
+  transform: rotate(var(--r, -8deg)) scale(.2); opacity: 0; transition: transform .3s .5s cubic-bezier(.3, 1.8, .5, 1), opacity .1s .5s;
+}
+.cpanel.on .csfx { opacity: 1; transform: rotate(var(--r, -8deg)) scale(1); }
+.comic-foot { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+.btn.ghost { background: var(--paper); font-size: 20px; }
+.cpanel.dim img { filter: brightness(.45) saturate(.7) contrast(1.2); }

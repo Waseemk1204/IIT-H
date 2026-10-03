@@ -18,6 +18,10 @@ export const ITEMS = {
   ball:      { name: 'Tennis ball', icon: '🎾', props: ['throw'], hint: 'Click / V: phenko.', throwNoise: 6, sfx: 'TUP! TUP!' },
   roomkey:   { name: 'Room 106 ki chaabi', icon: '🔑', props: ['key106'], hint: 'Apne hi kamre ki chaabi.' },
   gatekey:   { name: 'Main gate ki chaabi', icon: '🗝️', props: ['keyMain'], hint: 'Chowkidar ki chaabi. Main gate ka taala.' },
+  book:      { name: 'Udhaar ki kitaab', icon: '📖', props: ['book'], hint: 'Study circle mein baith ke ratta maaro. Warden khush.' },
+  kettle:    { name: 'Electric kettle', icon: '🫖', props: ['appliance'], hint: 'Bahut current kheenchti hai...' },
+  iron:      { name: 'Press (iron)', icon: '👔', props: ['appliance'], hint: 'Kisi ki shirt press karne waala tha.' },
+  heater:    { name: 'Room heater', icon: '🔥', props: ['appliance'], hint: "Warden Saab ka 'personal' heater." },
 };
 
 export const RECIPES = [
@@ -46,6 +50,9 @@ export const LOOT = {
   '14,12': ['bobbypin'],
   '21,12': ['bat'],               // Room 110
   '26,12': ['ball'],              // Lobby
+  '30,3': ['kettle'],             // Common room: carrom table
+  '40,12': ['iron'],              // Lobby almirah
+  '38,3': ['heater'],             // Warden's desk
 };
 
 const EMPTY_LINES = [
@@ -63,6 +70,19 @@ export const MY_DOOR = '2,8';
 export const CHOWKIDAR = { x: 34.5, z: 12.5 };
 export const RADIO = { x: 28.5, z: 1.5, cells: ['28,1', '29,1'] };
 export const CANTEEN = { x: 36, z: 18.5, r: 2.6 };
+
+// Act 2: where students sit and cram once the power is back. Each circle
+// takes up `cells`; you sit at `seat`, facing `yaw` (camera yaw).
+export const STUDY_CIRCLES = [
+  { id: 'A', cells: [[6, 7], [7, 7]], seat: { x: 8.35, z: 7.5 }, yaw: Math.PI / 2 },
+  { id: 'B', cells: [[15, 6], [16, 6]], seat: { x: 17.35, z: 6.5 }, yaw: Math.PI / 2 },
+  { id: 'C', cells: [[20, 7], [21, 7]], seat: { x: 19.65, z: 7.5 }, yaw: -Math.PI / 2 },
+  { id: 'D', cells: [[29, 8], [30, 8], [29, 9], [30, 9]], seat: { x: 31.35, z: 9 }, yaw: Math.PI / 2 },
+  { id: 'E', cells: [[36, 7], [37, 7]], seat: { x: 38.35, z: 7.5 }, yaw: Math.PI / 2 },
+];
+export const BOARD = { x: 33.5, z: 4.5, cell: '33,4' };
+export const FUSE_BOX = { x: 36.5, z: 1.5 };     // in the warden's room
+export const POWER_FALLBACK = 60;                 // seconds until someone fixes it anyway
 
 // Find every container: runs of beds, tables and almirahs.
 function findContainers(map) {
@@ -112,6 +132,11 @@ export function createJugaad(map) {
     distractions: new Set(),
     log: [],                    // score card lines { text, kind, points }
     emptyI: 0,
+    act: 1,                     // 1: dark. 2: the power came back.
+    power: { on: false, tripped: false, offT: 0 },
+    plugged: [],                // appliances in the extension board
+    seated: null,               // the study circle you are pretending in
+    circleByCell: new Map(),
   };
 }
 
@@ -194,6 +219,14 @@ export function actionsFor(st, target, ctx = {}) {
     A.push({ id: 'pickup', label: `Utha lo: ${name(target.w.item)}`, hold: 0 });
   } else if (target.type === 'radio') {
     A.push({ id: 'radio', label: st.radio.on ? 'Radio band karo' : 'Radio chalao (shor!)', hold: 0 });
+  } else if (target.type === 'circle') {
+    if (st.seated) A.push({ id: 'standUp', label: 'Uth jao', hold: 0 });
+    else if (!has(st, 'book')) A.push({ id: 'borrowBook', label: 'Ek kitaab udhaar maango', hold: 0 });
+    else A.push({ id: 'sit', label: 'Baith ke padhai ka natak karo', hold: 0 });
+  } else if (target.type === 'board') {
+    if (!st.power.on) return A;
+    const ap = itemWith(st, 'appliance');
+    if (ap) A.push({ id: 'plug', label: `${name(ap)} plug karo (${st.plugged.length + 1}/3)`, hold: 1 });
   } else if (target.type === 'chowkidar') {
     const ch = st.chowkidar;
     if (ch.awake || !ch.hasKeys) return A;
@@ -234,6 +267,10 @@ export function lockedHint(st, target) {
     if (st.chowkidar.awake) return 'Chowkidar jaag gaya hai! Door raho.';
     if (!st.chowkidar.hasKeys) return 'Zzz... (chaabi toh tumhare paas hai)';
     return 'Chaabi uski belt pe latak rahi hai. Paas jaao... chupke se.';
+  }
+  if (target.type === 'board') {
+    if (!st.power.on) return 'Extension board. Bijli toh gayi hui hai.';
+    return `Extension board (${st.plugged.length}/3). Kettle, press aur heater ek saath lagao... toh?`;
   }
   if (target.type !== 'door') return null;
   const d = target.door;
@@ -364,6 +401,31 @@ export function perform(st, target, action, ctx = {}) {
       msg(action.id === 'hookKeys' ? 'Lambi kundi se chaabi utaar li. Chowkidar ko pata bhi nahi chala!' : 'Chaabi nikal li! Saans mat lena...');
       break;
     }
+    case 'borrowBook': {
+      st.inv.length < INV_CAP ? st.inv.push('book') : dropItem(st, 'book', at.x, at.z);
+      st.sel = st.inv.indexOf('book');
+      ev.push({ type: 'got', items: ['book'] });
+      ev.push({ type: 'say', who: 'student', x: at.x, z: at.z, line: ['Le, par wapas dena!', 'Chapter 4 padh, wahi aayega.', 'Bhai notes bhi chahiye? 50 rupay.'][st.emptyI++ % 3] });
+      break;
+    }
+    case 'sit': {
+      st.seated = target.circle;
+      msg('Baith gaye. Ab ratta maaro... aur Warden Saab ki taraf mat dekho.');
+      break;
+    }
+    case 'standUp': {
+      st.seated = null;
+      break;
+    }
+    case 'plug': {
+      const ap = itemWith(st, 'appliance');
+      removeItem(st, ap);
+      st.plugged.push(ap);
+      if (st.plugged.length < 3) { noise(1, 'KLIK', 0.7); msg(`${ITEMS[ap].name} lag gaya. Board garam ho raha hai...`); break; }
+      tripFuse(st, ev);
+      solve(st, 'fuse', 'improvised', 'Kettle + press + heater = fuse ud gaya');
+      break;
+    }
     case 'unlockMain': {
       openGroup('M');
       removeItem(st, 'gatekey');
@@ -374,6 +436,37 @@ export function perform(st, target, action, ctx = {}) {
     }
   }
   return ev;
+}
+
+// ---------- Act 2: the power comes back ----------
+export function startAct2(st) {
+  if (st.act === 2) return [];
+  st.act = 2;
+  st.power.on = true;
+  for (const c of STUDY_CIRCLES) {
+    for (const [x, z] of c.cells) {
+      st.map.extraSolid.add(`${x},${z}`);
+      st.circleByCell.set(`${x},${z}`, c);
+    }
+  }
+  return [{ type: 'power', on: true, first: true }];
+}
+
+function tripFuse(st, ev) {
+  st.power.on = false; st.power.tripped = true; st.power.offT = 0;
+  st.seated = null;
+  ev.push({ type: 'noise', x: BOARD.x, z: BOARD.z, r: 16 });
+  ev.push({ type: 'sfx', text: 'PHATAAK!!', x: BOARD.x, z: BOARD.z, size: 1.6 });
+  ev.push({ type: 'power', on: false });
+}
+
+// Someone fixed the fuse: lights back on, the appliances fall out of the board.
+export function restorePower(st) {
+  if (st.power.on) return [];
+  st.power.on = true; st.power.tripped = false;
+  st.plugged.forEach((id, i) => dropItem(st, id, BOARD.x - 0.4 - i * 0.35, BOARD.z - 0.6));
+  st.plugged = [];
+  return [{ type: 'power', on: true }];
 }
 
 // Slipped through the grill gate while Warden Saab had it open.
@@ -441,6 +534,21 @@ export function updateJugaad(st, dt, { player, warden }) {
         }
       }
     }
+  }
+
+  // Nobody fixed the fuse? The generator wallah gets to it eventually.
+  if (st.power.tripped) {
+    st.power.offT += dt;
+    if (st.power.offT > POWER_FALLBACK) {
+      ev.push(...restorePower(st));
+      ev.push({ type: 'msg', text: 'Generator chalu! Bijli wapas aa gayi.' });
+    }
+  }
+
+  // Cramming right under his nose.
+  if (st.seated && warden && !st.solved.hide && Math.hypot(warden.x - player.x, warden.z - player.z) < 4.5 && warden.mode === 'patrol') {
+    solve(st, 'hide', 'sneaky', 'Group study mein ghus ke Warden Saab ke saamne ratta maara');
+    ev.push({ type: 'say', who: 'warden', line: 'Shabash! Aise hi padhai karo sab.' });
   }
 
   // The chowkidar: asleep, but not deaf.

@@ -27,7 +27,9 @@ export function createWarden(map, start, route) {
     x: start.x, z: start.z,
     yaw: Math.PI / 2,
     lookOffset: 0,         // torch sweep while standing
-    mode: 'patrol',        // patrol | suspicious | investigate | search | chase
+    mode: 'patrol',        // patrol | suspicious | investigate | search | chase | errand
+    lightsOn: false,       // power back: he sees without his torch
+    errand: null,          // { x, z, wait, tag }
     route, wp: 0,
     path: null, pathI: 0,
     wait: 0, waitLook: null,
@@ -49,7 +51,7 @@ export function resumePatrol(w) {
     const d = Math.hypot(p.x - w.x, p.z - w.z);
     if (d < bd) { bd = d; best = i; }
   });
-  w.wp = best; w.mode = 'patrol'; w.meter = 0;
+  w.wp = best; w.mode = 'patrol'; w.meter = 0; w.errand = null;
   w.path = null; w.wait = 0; w.target = null; w.lastSeen = null;
 }
 
@@ -61,8 +63,17 @@ export function sightRate(w, p, map) {
   const torchYaw = w.yaw + w.lookOffset;
   const off = Math.abs(angleDiff(yawTo(dx, dz), torchYaw));
   const bodyOff = Math.abs(angleDiff(yawTo(dx, dz), w.yaw));
+  // Sitting in a study circle with a book: just another student cramming.
+  if (p.hidden && w.mode !== 'chase' && dist > 1.2) return 0;
   if (!lineOfSight(map, w.x, w.z, p.x, p.z, { targetCrouched: p.crouch })) return 0;
   let rate = 0;
+  if (w.lightsOn) {
+    // Tube lights on: no shadows to hide in. He sees anything in front of him.
+    if (bodyOff < 1.2) rate = 0.3 + 1.3 * Math.max(0, 1 - dist / 15) ** 1.5;
+    else if (dist < 2.2 && bodyOff < 1.6) rate = 0.9;
+    if (p.crouch) rate *= 0.7;
+    return rate;
+  }
   if (off < BEAM_HALF_ANGLE + 0.04 && dist < BEAM_RANGE) {
     rate = 0.25 + 1.4 * (1 - dist / 12) ** 2;                // caught in his beam: fast up close
   } else if (p.torch && bodyOff < 1.45) {
@@ -141,6 +152,14 @@ function closeGatesBehind(w, events) {
   }
 }
 
+// Send him somewhere to do something (fix the fuse). Seeing you still interrupts.
+export function sendWarden(w, x, z, wait, tag) {
+  w.mode = 'errand';
+  w.errand = { x, z, wait, tag };
+  if (!setPath(w, x, z)) { w.mode = 'patrol'; w.errand = null; return false; }
+  return true;
+}
+
 // One tick. `player` = { x, z, crouch, torch }, `noises` = [{ x, z, r }].
 export function updateWarden(w, dt, player, noises = []) {
   const events = [];
@@ -168,12 +187,12 @@ export function updateWarden(w, dt, player, noises = []) {
   if (seen && w.meter >= CHASE_AT && w.mode !== 'chase') {
     w.mode = 'chase';
     events.push({ type: 'say', line: 'Ruk! Ruk ja wahin!', mood: 'angry' });
-  } else if (seen && w.meter >= SUSPICIOUS_AT && (w.mode === 'patrol' || w.mode === 'search' || w.mode === 'investigate')) {
+  } else if (seen && w.meter >= SUSPICIOUS_AT && (w.mode === 'patrol' || w.mode === 'search' || w.mode === 'investigate' || w.mode === 'errand')) {
     w.mode = 'suspicious'; w.wait = 0;
     events.push({ type: 'say', line: 'Kaun hai wahan?!', mood: 'alert' });
   }
 
-  if (w.mode !== 'chase' && w.mode !== 'suspicious') {
+  if (w.mode !== 'chase' && w.mode !== 'suspicious' && w.mode !== 'errand') {
     for (const n of noises) {
       const nd = Math.hypot(n.x - w.x, n.z - w.z);
       const heard = lineOfSight(w.map, w.x, w.z, n.x, n.z) ? n.r : n.r * 0.55;
@@ -245,6 +264,18 @@ export function updateWarden(w, dt, player, noises = []) {
     }
     case 'investigate': {
       if (followPath(w, dt, SPEED.investigate, events)) { w.mode = 'search'; w.searchT = 0; }
+      break;
+    }
+    case 'errand': {
+      const e = w.errand;
+      if (followPath(w, dt, SPEED.investigate, events)) {
+        w.lookOffset = Math.sin(w.t * 3) * 0.3;
+        e.wait -= dt;
+        if (e.wait <= 0) {
+          events.push({ type: 'errandDone', tag: e.tag });
+          resumePatrol(w);
+        }
+      }
       break;
     }
     case 'search': {

@@ -11,6 +11,8 @@ export function startAudio() {
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   crickets();
+  powerBed();
+  music();
 }
 
 function out(pan = 0, gain = 1) {
@@ -132,3 +134,108 @@ function crickets() {
 }
 
 export function setMuted(m) { if (master) master.gain.value = m ? 0 : 0.8; }
+
+// ---------- Phase 3: the power, the crowd, the music ----------
+let humGain = null, crowdOn = false, tension = 0;
+
+// Mains hum and fan whoosh, faded in when the power is on.
+function powerBed() {
+  humGain = ctx.createGain();
+  humGain.gain.value = 0;
+  humGain.connect(master);
+  for (const [f, v] of [[50, 0.05], [100, 0.03], [150, 0.01]]) {
+    const o = ctx.createOscillator(); o.frequency.value = f;
+    const g = ctx.createGain(); g.gain.value = v;
+    o.connect(g).connect(humGain); o.start();
+  }
+  const fan = ctx.createBufferSource(); fan.buffer = noiseBuf; fan.loop = true;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380;
+  const fg = ctx.createGain(); fg.gain.value = 0.12;
+  fan.connect(lp).connect(fg).connect(humGain); fan.start();
+  // a murmuring crowd: short vowel-ish bursts from everywhere
+  const murmur = () => {
+    if (!ctx) return;
+    if (crowdOn) {
+      const o = out(Math.random() * 1.6 - 0.8, 0.05);
+      noiseBurst(o, { dur: 0.25 + Math.random() * 0.3, freq: 300 + Math.random() * 700, q: 6, vol: 0.6 });
+    }
+    setTimeout(murmur, 120 + Math.random() * 260);
+  };
+  murmur();
+}
+
+export function setPower(on) {
+  if (!ctx) return;
+  crowdOn = on;
+  humGain.gain.cancelScheduledValues(ctx.currentTime);
+  humGain.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, on ? 0.6 : 0.05);
+}
+
+export function tubeTinks() {
+  if (!ctx) return;
+  const o = out(0, 0.6);
+  for (let i = 0; i < 6; i++) tone(o, { f0: 2400 + Math.random() * 800, dur: 0.03, type: 'square', vol: 0.05, at: i * 0.18 + Math.random() * 0.1 });
+}
+
+export function cheer() {
+  if (!ctx) return;
+  for (let i = 0; i < 14; i++) {
+    const o = out(Math.random() * 2 - 1, 0.18);
+    noiseBurst(o, { dur: 0.6 + Math.random() * 0.5, freq: 500 + Math.random() * 900, q: 4, vol: 0.5, at: Math.random() * 0.5 });
+  }
+}
+
+export function groan() {
+  if (!ctx) return;
+  for (let i = 0; i < 10; i++) {
+    const o = out(Math.random() * 2 - 1, 0.18);
+    tone(o, { f0: 260 + Math.random() * 120, f1: 140 + Math.random() * 40, dur: 0.9, type: 'sawtooth', vol: 0.05, at: Math.random() * 0.3 });
+  }
+}
+
+export function fuseBlow() {
+  if (!ctx) return;
+  const o = out(0, 1);
+  tone(o, { f0: 120, f1: 30, dur: 0.6, type: 'square', vol: 0.3 });
+  noiseBurst(o, { dur: 0.5, freq: 1800, q: 0.4, vol: 0.9, type: 'lowpass' });
+  for (let i = 0; i < 8; i++) noiseBurst(o, { dur: 0.03, freq: 4000, q: 3, vol: 0.4, at: 0.1 + Math.random() * 0.6 });
+}
+
+// 0: calm, 1: he is suspicious, 2: he is chasing you.
+export function setTension(level) { tension = level; }
+
+// A dhol-and-tabla loop that gets busier the more trouble you are in.
+function music() {
+  const beat = 60 / 112 / 2;            // eighth notes
+  let next = ctx.currentTime + 0.2, step = 0;
+  const bus = ctx.createGain(); bus.gain.value = 0.5; bus.connect(master);
+  const dha = (t, v) => {             // low dhol
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.18);
+    const g = ctx.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g).connect(bus); o.start(t); o.stop(t + 0.32);
+  };
+  const na = (t, v) => {              // tabla ring
+    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(620, t);
+    const g = ctx.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    o.connect(g).connect(bus); o.start(t); o.stop(t + 0.14);
+  };
+  setInterval(() => {
+    if (!ctx) return;
+    while (next < ctx.currentTime + 0.15) {
+      const s = step % 16;
+      if (tension === 0) {
+        if (s === 0 || s === 10) dha(next, 0.12);
+      } else if (tension === 1) {
+        if (s % 4 === 0) dha(next, 0.22);
+        if (s % 4 === 2 || s === 7) na(next, 0.06);
+      } else {
+        if (s % 2 === 0) dha(next, 0.32);
+        if (s % 2 === 1) na(next, 0.08);
+        if (s === 6 || s === 14) dha(next + beat / 2, 0.25);
+      }
+      next += tension === 2 ? beat * 0.75 : beat;
+      step++;
+    }
+  }, 50);
+}

@@ -144,6 +144,12 @@ export function createWardenModel() {
     beam,
     head,
     setMood(m) { mood = m; moodT = 2.5; },
+    // With the tube lights on he puts his torch away.
+    setTorch(on) {
+      spot.intensity = on ? 90 : 0;
+      beam.visible = on;
+      lens.material.color.set(on ? 0xfff4c8 : 0x333333);
+    },
     update(w, dt) {
       group.position.set(w.x, 0, w.z);
       group.rotation.y = w.yaw;

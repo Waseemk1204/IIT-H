@@ -284,6 +284,7 @@ export function buildWorld(map) {
   // ---- Fixtures: switched-off tube lights and ceiling fans (Act 2 turns them on)
   const tubes = [];
   const tubeMat = new THREE.MeshToonMaterial({ color: 0xbfc4c8, emissive: 0x000000 });
+  const fans = [];
   const addTube = (x, z, rotY = 0) => {
     const t = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.05, 0.07), tubeMat);
     t.position.set(x, WALL_H - 0.06, z); t.rotation.y = rotY;
@@ -293,8 +294,36 @@ export function buildWorld(map) {
   for (let x = 29; x < 41; x += 5) addTube(x, 8.5);
   addTube(30, 2.5);
   for (let i = 0; i < 5; i++) {
-    for (const zc of [3, 11]) root.add(fan(i * 5 + 2.5, zc));
+    for (const zc of [3, 11]) { const f = fan(i * 5 + 2.5, zc); fans.push(f); root.add(f); }
   }
+  // The lights the tubes give off when the power is back (off until then).
+  const powerLights = [];
+  for (const [x, z] of [[5.5, 7], [13, 7], [20.5, 7], [30, 8.5], [37, 8.5], [32, 11.5], [30, 2.5], [37.5, 2.5]]) {
+    const l = new THREE.PointLight(0xeef4ff, 0, 9, 1.4);
+    l.position.set(x, WALL_H - 0.3, z);
+    root.add(l); powerLights.push(l);
+  }
+
+  // ---- The extension board in the common room, and the fuse box
+  const boardG = new THREE.Group();
+  boardG.add(inkBox(0.6, 0.45, 0.6, C.table, 0, 0, 0));                    // a stool
+  boardG.add(inkBox(0.45, 0.06, 0.14, 0xeeeeee, 0, 0.45, 0, 0.008));         // the board
+  for (let i = 0; i < 3; i++) boardG.add(inkBox(0.06, 0.012, 0.05, 0x222222, -0.13 + i * 0.13, 0.51, 0, 0.004));
+  const boardLed = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: 0x331111 }));
+  boardLed.position.set(0.2, 0.52, 0.04);
+  boardG.add(boardLed);
+  const pluggedSlots = [];
+  for (let i = 0; i < 3; i++) {
+    const plug = inkBox(0.05, 0.05, 0.05, 0x111111, -0.13 + i * 0.13, 0.51, 0, 0.004);
+    plug.visible = false; boardG.add(plug); pluggedSlots.push(plug);
+  }
+  boardG.position.set(33.5, 0, 4.5);
+  root.add(boardG);
+  const fuseBox = inkBox(0.5, 0.6, 0.15, 0x6d6d64, 36.5, 1.5, 1.08);
+  root.add(fuseBox);
+  const fuseLabel = signMesh(textPanel([{ text: 'MCB', font: 'bold 70px Impact, sans-serif' }], { w: 128, h: 72, bg: '#e8b923' }), 0.2, 0.11);
+  fuseLabel.position.set(36.5, 2.17, 1.16);
+  root.add(fuseLabel);
 
   // ---- Signs
   const notice = signMesh(textPanel([
@@ -330,7 +359,27 @@ export function buildWorld(map) {
 
   return {
     root, doors, gates, tubes, lantern, radio,
+    power: 0,                  // 0 dark .. 1 lit; set by setPower, eased in update
+    target: 0, flicker: 0,
+    setPower(on, flicker = false) { this.target = on ? 1 : 0; this.flicker = on && flicker ? 1.6 : 0; },
+    setPlugged(n) {
+      pluggedSlots.forEach((p, i) => { p.visible = i < n; });
+      boardLed.material.color.set(n >= 2 ? 0xff3322 : n === 1 ? 0xffaa22 : 0x331111);
+    },
     update(dt) {
+      // Tube lights: a stuttering start (tink... tink-tink) then steady.
+      let lit = this.target;
+      if (this.flicker > 0) {
+        this.flicker -= dt;
+        lit = Math.sin(this.flicker * 37) > 0.2 || this.flicker < 0.3 ? 1 : 0.05;
+      }
+      this.power += (lit - this.power) * Math.min(1, dt * (lit < this.power ? 30 : 12));
+      tubeMat.emissive.setScalar(this.power * 0.95);
+      for (const l of powerLights) l.intensity = this.power * 7;
+      for (const f of fans) {
+        f.userData.speed += ((this.target ? 9 : 0) - f.userData.speed) * Math.min(1, dt * 0.6);
+        f.userData.rotor.rotation.y += f.userData.speed * dt;
+      }
       for (const w of windows) {
         const broken = w.door.open;
         w.grill.visible = w.loose.visible = !broken;
@@ -432,12 +481,15 @@ function fan(x, z) {
   const hub = inkMesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 12), 0x8b6d4b, 0.01);
   hub.position.y = WALL_H - 0.38;
   g.add(hub);
+  const rotor = new THREE.Group();
   for (let i = 0; i < 3; i++) {
     const blade = inkBox(0.55, 0.01, 0.1, 0x8b6d4b, 0.33, WALL_H - 0.38, 0, 0.006);
     const arm = new THREE.Group();
     arm.add(blade); arm.rotation.y = (i * Math.PI * 2) / 3;
-    g.add(arm);
+    rotor.add(arm);
   }
+  g.add(rotor);
+  g.userData = { rotor, speed: 0 };
   g.position.set(x, 0, z);
   return g;
 }

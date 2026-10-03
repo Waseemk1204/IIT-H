@@ -12,12 +12,13 @@
 //   o  outside ground               P  player start (floor)
 //   W  loose window grill (see-through; a bat can break it)
 //   k  the chowkidar, asleep on his chair (low)
+//   E  the common room extension board (low)
 export const ROWS = [
   '##########################################',
   '#bb.c#bb.c#bb.c#bb.c#bb.c#s.cc...s#c...bb#',
   '#....#....#....#....#....#s.......#......#',
   '#....#....#....#....#....#s...tt..#...tt.#',
-  '#t..t#t..t#t..t#t..t#t..t#........#......#',
+  '#t..t#t..t#t..t#t..t#t..t#.......E#......#',
   '##D####D####D####D####D#####....#####D####',
   '#........................G...............#',
   '#........................G...............#',
@@ -38,7 +39,7 @@ export const ROWS = [
 ];
 
 export const WALL_H = 3;
-export const LOW = new Set(['b', 't', 's', 'Q', 'k']);
+export const LOW = new Set(['b', 't', 's', 'Q', 'k', 'E']);
 export const TALL = new Set(['#', 'c', 'T']);
 export const GATES = new Set(['G', 'M']);
 
@@ -73,7 +74,8 @@ export function createMap(rows = ROWS) {
       }
     }
   }
-  return { w, h, cells, spawn, doors };
+  // extraSolid: cells taken up at runtime (students sitting in study circles).
+  return { w, h, cells, spawn, doors, extraSolid: new Set() };
 }
 
 export const key = (x, z) => `${x},${z}`;
@@ -92,6 +94,7 @@ export function doorAt(map, cx, cz) {
 export function solidForPlayer(map, cx, cz) {
   if (cx < 0 || cz < 0 || cx >= map.w || cz >= map.h) return true;
   const c = map.cells[cz][cx];
+  if (map.extraSolid.has(key(cx, cz))) return true;
   if (c === '.' || c === 'o') return false;
   if (c === 'D' || c === 'G' || c === 'M' || c === 'W') return !doorAt(map, cx, cz).open;
   return true;
@@ -101,6 +104,7 @@ export function solidForPlayer(map, cx, cz) {
 export function walkableForWarden(map, cx, cz) {
   if (cx < 0 || cz < 0 || cx >= map.w || cz >= map.h) return false;
   const c = map.cells[cz][cx];
+  if (map.extraSolid.has(key(cx, cz))) return false;
   return c === '.' || c === 'o' || c === 'D' || c === 'G' || c === 'M';
 }
 
@@ -143,7 +147,7 @@ function blocksSight(map, cx, cz, opts, tx, tz) {
   const c = map.cells[cz][cx];
   if (TALL.has(c)) return true;
   if (c === 'D') return !doorAt(map, cx, cz).open;
-  if (LOW.has(c) && opts.targetCrouched) {
+  if ((LOW.has(c) || map.extraSolid.has(key(cx, cz))) && opts.targetCrouched) {
     const d = Math.hypot(cx + 0.5 - tx, cz + 0.5 - tz);
     return d < 1.6;
   }

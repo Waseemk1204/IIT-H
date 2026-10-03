@@ -1,7 +1,7 @@
 // What are you looking at? Doors, containers, the radio, items on the floor
 // and the sleeping chowkidar, within arm's reach in front of you.
 import { doorAt, solidForPlayer } from '../shared/map.js';
-import { RADIO, MY_DOOR } from '../shared/jugaad.js';
+import { RADIO, MY_DOOR, BOARD } from '../shared/jugaad.js';
 import { forward } from './player.js';
 
 const REACH = 1.7;
@@ -40,6 +40,9 @@ export function findTarget(player, st) {
       return { type: 'door', door, dist: d, inside, at: { x: cx + 0.5, z: cz + 0.5 }, key: `door:${k}` };
     }
     if (RADIO.cells.includes(k)) return { type: 'radio', dist: d, at: { x: RADIO.x, z: RADIO.z }, key: 'radio' };
+    const circle = st.circleByCell.get(k);
+    if (circle && st.act === 2) return { type: 'circle', circle, dist: d, at: { x: cx + 0.5, z: cz + 0.5 }, key: `circle:${circle.id}` };
+    if (k === BOARD.cell) return { type: 'board', dist: d, at: { x: BOARD.x, z: BOARD.z }, key: 'board' };
     const cont = st.byCell.get(k);
     if (cont) return { type: 'container', container: cont, dist: d, at: { x: cx + 0.5, z: cz + 0.5 }, key: `cont:${cont.id}` };
     if (solidForPlayer(map, cx, cz)) return null;
