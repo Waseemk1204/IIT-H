@@ -156,12 +156,34 @@ sens.addEventListener('input', () => { sensitivity = Number(sens.value); store.s
 document.getElementById('restart').addEventListener('click', () => location.reload());
 document.getElementById('late-again').addEventListener('click', () => location.reload());
 
+// Full screen: the buttons on the title, pause menu and HUD all toggle it.
+const fsButtons = document.querySelectorAll('.fs-btn');
+const canFullscreen = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement || document.webkitFullscreenElement) await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else await (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement);
+  } catch { /* the browser said no */ }
+}
+function syncFullscreenButtons() {
+  const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  for (const b of fsButtons) {
+    b.hidden = !canFullscreen;
+    if (b.classList.contains('fs-label')) b.textContent = on ? '⛶ EXIT FULL SCREEN' : '⛶ FULL SCREEN';
+    b.title = on ? 'Exit full screen' : 'Full screen';
+  }
+}
+for (const b of fsButtons) b.addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
+document.addEventListener('fullscreenchange', syncFullscreenButtons);
+document.addEventListener('webkitfullscreenchange', syncFullscreenButtons);
+syncFullscreenButtons();
+
 const portrait = matchMedia('(orientation: portrait)');
 let introDone = false;
 document.getElementById('start').addEventListener('click', async () => {
   sfx.startAudio();
   if (isTouch) {
-    try { await document.documentElement.requestFullscreen?.(); } catch { /* not allowed */ }
+    if (!document.fullscreenElement) try { await document.documentElement.requestFullscreen?.(); } catch { /* not allowed */ }
     try { await screen.orientation?.lock?.('landscape'); } catch { /* iPhone can't */ }
   }
   if (!introDone && !window.__skipComics) await playComic(openingPanels(), { title: 'Raat 1:29 baje...' });

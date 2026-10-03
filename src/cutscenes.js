@@ -47,7 +47,6 @@ export function playComic(panels, { title = '' } = {}) {
     const reveal = () => {
       if (i < els.length) {
         els[i].classList.add('on');
-        els[i].scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
         i++;
         next.textContent = i < els.length ? 'AAGE →' : 'CHALO! →';
       } else finish();
@@ -57,11 +56,12 @@ export function playComic(panels, { title = '' } = {}) {
       else if (['Space', 'Enter', 'KeyE', 'ArrowRight'].includes(e.code)) { e.preventDefault(); reveal(); }
     };
     const finish = () => {
-      next.onclick = skip.onclick = null;
+      next.onclick = skip.onclick = root.onclick = null;
       removeEventListener('keydown', onKey);
       resolve();
     };
     next.onclick = reveal;
+    root.onclick = reveal;           // clicking the page turns it too
     skip.onclick = finish;
     addEventListener('keydown', onKey);
     reveal();

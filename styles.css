@@ -184,16 +184,20 @@ h2 { font-family: var(--comic); font-weight: 400; font-size: 44px; margin: 0 0 8
 .title-card b { font-family: var(--comic); font-weight: 400; font-size: 28px; letter-spacing: 1px; color: var(--red); }
 
 /* ---------- Phase 3: comic-page cutscenes ---------- */
-#comic { background: #1a1612; align-items: start; overflow: auto; }
+#comic { background: #1a1612; place-items: center; overflow: hidden; }
+/* The whole page always fits the screen: panels are sized from the height. */
 .comic-page {
-  width: min(1100px, 100%); margin: auto; padding: 14px; background: var(--paper);
+  --chrome: 150px;                      /* title + buttons + padding */
+  display: flex; flex-direction: column;
+  width: min(1100px, 100%, calc((100dvh - 32px - var(--chrome)) * 4 / 3 + 40px));
+  height: min(calc(100dvh - 32px), calc((min(1100px, 100vw - 32px) - 40px) * 3 / 4 + var(--chrome)));
+  padding: 12px 14px; background: var(--paper);
   border: 5px solid var(--ink); box-shadow: 10px 10px 0 #000;
 }
-#comic-title { font-family: var(--comic); font-weight: 400; font-size: 28px; letter-spacing: 2px; color: var(--ink); margin: 0 0 10px; }
-#comic-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 720px) { #comic-panels { grid-template-columns: 1fr; } }
+#comic-title { font-family: var(--comic); font-weight: 400; font-size: 28px; letter-spacing: 2px; color: var(--ink); margin: 0 0 8px; flex: none; }
+#comic-panels { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; cursor: pointer; }
 .cpanel {
-  position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #000;
+  position: relative; min-height: 0; overflow: hidden; background: #000;
   border: 4px solid var(--ink); opacity: 0; transform: scale(.94) rotate(-.6deg); transition: opacity .35s, transform .35s;
 }
 .cpanel:nth-child(even) { transform: scale(.94) rotate(.6deg); }
@@ -218,7 +222,24 @@ h2 { font-family: var(--comic); font-weight: 400; font-size: 44px; margin: 0 0 8
   transform: rotate(var(--r, -8deg)) scale(.2); opacity: 0; transition: transform .3s .5s cubic-bezier(.3, 1.8, .5, 1), opacity .1s .5s;
 }
 .cpanel.on .csfx { opacity: 1; transform: rotate(var(--r, -8deg)) scale(1); }
-.comic-foot { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+.comic-foot { flex: none; display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; }
+@media (max-height: 520px) {
+  /* Short landscape phones: use the width too (panels crop a little wider than 4:3). */
+  .comic-page {
+    --chrome: 104px; padding: 8px 10px;
+    width: min(100%, calc((100dvh - 32px - var(--chrome)) * 2.1 + 30px));
+    height: calc(100dvh - 32px);
+  }
+  .cbub { max-width: 70%; }
+  .csfx { font-size: 26px; -webkit-text-stroke: 2px var(--ink); text-shadow: 3px 3px 0 var(--ink); }
+  #comic-title { font-size: 18px; margin-bottom: 4px; }
+  .comic-foot { margin-top: 6px; }
+  .comic-foot .btn { font-size: 16px; padding: 4px 14px; }
+  #comic-panels { gap: 6px; }
+  .cbub { font-size: 11px; padding: 2px 7px; border-width: 2px; line-height: 1.1; }
+  .cbub::after { left: 14px; bottom: -10px; border-width: 6px; border-top-width: 8px; }
+  .cpanel .cap { font-size: 11px; padding: 2px 6px; }
+}
 .btn.ghost { background: var(--paper); font-size: 20px; }
 .cpanel.dim img { filter: brightness(.45) saturate(.7) contrast(1.2); }
 
@@ -288,3 +309,9 @@ body.touch #crosshair { display: none; }
 }
 #score-lines li.time b { color: var(--blue); }
 body.touch #title .controls { display: none; }
+
+/* ---------- full screen buttons ---------- */
+.fs-hud { pointer-events: auto; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 9px; }
+.fs-btn[hidden] { display: none !important; }
+#title .fs-label { display: block; margin: 12px auto 0; font-size: 18px; padding: 6px 18px; }
+#pause .fs-label { font-size: 18px; }
