@@ -6,6 +6,7 @@ It is 1:30 AM before the Endsem, the hostel has a power cut, and the night cante
 Sneak past the warden's torch and through the locked gate with whatever a hostel has lying around.
 Halfway through, the power comes back.
 
+- **Play it: https://waseemk1204.github.io/IIT-H/** (desktop browser, or a phone held sideways)
 - Proposal: [proposal.pdf](proposal.pdf) (source: [docs/proposal.html](docs/proposal.html))
 - Solo developer: Mohammad Waseem Khan · [IndieConnect @waseemk1204](https://www.indieconnect.in/@waseemk1204)
 
