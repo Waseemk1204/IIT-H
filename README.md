@@ -29,6 +29,11 @@ npm test
 
 runs the tests for the map, collision, line of sight and the warden's AI.
 
+**First time?** A short tutorial runs inside Room 106: look, walk, torch, search, pick an
+item, and get through your locked door (a yellow arrow points at what to use, and the clock
+waits until you are out). Then a few stealth tips. Press T (or Skip) to skip it; the pause
+menu can replay it.
+
 **On a phone:** landscape only. Held upright, the page shows nothing but a "turn your phone"
 card (pure CSS, so it works before the game loads) and the game pauses and stops drawing.
 Phones get a lighter build: static furniture and walls are baked into a few big meshes
@@ -117,6 +122,7 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | `src/render/students.js` | Act 2's students cramming in study circles |
 | `src/cutscenes.js` | Comic-page cutscenes built from engine-rendered panels |
 | `src/input.js` | Keyboard, mouse, and the phone joystick, look-drag and buttons |
+| `src/tutorial.js` | The first-room tutorial: steps that finish when you do the thing |
 | `src/main.js` | Renderer, the game loop, and the glue between player, warden and HUD |
 | `src/player.js` | First-person movement, crouch, run, footstep noise |
 | `src/render/world.js` | Builds the hostel in 3D from the grid |
@@ -139,3 +145,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | Comic pages that fit the screen, full screen buttons, phone optimisation (static mesh merging, lite lighting, adaptive resolution, contextual touch buttons, haptics), portrait blocked. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Five chances with a HUD counter and last-chance warning; the parents-call and detention comic ending. |
 | 3 Oct 2026 | Claude Code (Anthropic) | New win: order at the stall, hide while the warden patrols outside, carry the Maggi back (smell, no running), eat it in Room 106; new ending comic. |
+| 3 Oct 2026 | Claude Code (Anthropic) | First-room tutorial with step cards, a 3D pointer arrow, clock freeze, skip and replay. |

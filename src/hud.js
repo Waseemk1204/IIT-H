@@ -13,6 +13,8 @@ export function createHud() {
   const inv = $('inventory'), invInfo = $('inv-info'), holdEl = $('hold'), toasts = $('toasts'), pop = $('bigpop');
   let lastPrompt = '', lastInv = '', lastObjective = '', lastChances = -1;
   const chances = $('chances');
+  const tutEl = $('tutorial'), tutStep = $('tut-step'), tutText = $('tut-text');
+  let lastTut = '';
   const objective = $('objective');
   const bubbles = [];
   const v = new THREE.Vector3();
@@ -69,6 +71,20 @@ export function createHud() {
     bigPop(text) {
       pop.textContent = text;
       pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go');
+    },
+    // The tutorial card (text is trusted, it comes from tutorial.js).
+    setTutorial(html, n, total) {
+      const key = html ? `${n}|${html}` : '';
+      if (key === lastTut) return;
+      lastTut = key;
+      tutEl.classList.toggle('show', !!html);
+      document.body.classList.toggle('tutoring', !!html);
+      if (!html) return;
+      tutStep.textContent = `TUTORIAL ${n}/${total}`;
+      tutText.innerHTML = html;
+    },
+    tutorialTick() {
+      tutEl.classList.remove('tick'); void tutEl.offsetWidth; tutEl.classList.add('tick');
     },
     setChances(left, total) {
       if (left === lastChances) return;

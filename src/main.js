@@ -10,6 +10,7 @@ import {
 } from '../shared/jugaad.js';
 import { createStudents } from './render/students.js';
 import { playComic } from './cutscenes.js';
+import { createTutorial } from './tutorial.js';
 import { buildWorld } from './render/world.js';
 import { createWardenModel } from './render/warden.js';
 import { createChowkidarModel } from './render/chowkidar.js';
@@ -126,6 +127,30 @@ plate.position.set(1.55, 0.76, 9.45);
 plate.visible = false;
 scene.add(plate);
 
+// The tutorial and its bouncing arrow.
+const tutorial = createTutorial({ isTouch });
+let tutorialStarted = false;
+const marker = new THREE.Group();
+{
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 4), new THREE.MeshBasicMaterial({ color: 0xf2c230 }));
+  cone.rotation.x = Math.PI;                         // pointing down
+  const edge = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.36, 4), new THREE.MeshBasicMaterial({ color: 0x14110f, side: THREE.BackSide }));
+  edge.rotation.x = Math.PI;
+  marker.add(cone, edge);
+  marker.visible = false;
+  scene.add(marker);
+}
+function placeMarker(m) {
+  marker.visible = !!m;
+  if (m) { marker.position.set(m.x, m.y + Math.abs(Math.sin(time * 4)) * 0.18, m.z); marker.rotation.y = time * 2; }
+}
+function endTutorial() {
+  tutorial.stop();
+  store.set('tutorialDone', true);
+  hud.setTutorial(null);
+  marker.visible = false;
+}
+
 // Bhaiya, at his stall.
 const bhaiya = createBhaiya(scene);
 const bhaiyaHead = () => bhaiya.headWorld();
@@ -160,6 +185,7 @@ resize();
 // ---- overlays and pause
 function startPlaying() {
   sfx.startAudio();
+  if (!tutorialStarted && !store.get('tutorialDone', false)) { tutorialStarted = true; tutorial.start(); }
   input.lock();
   state = 'playing';
   showOverlay(null);
@@ -174,6 +200,8 @@ const sens = document.getElementById('sens');
 sens.value = sensitivity;
 sens.addEventListener('input', () => { sensitivity = Number(sens.value); store.set('sens', sensitivity); });
 document.getElementById('restart').addEventListener('click', () => location.reload());
+document.getElementById('tut-replay').addEventListener('click', () => { store.set('tutorialDone', false); location.reload(); });
+document.getElementById('tut-skip').addEventListener('click', (e) => { e.stopPropagation(); endTutorial(); });
 document.getElementById('late-again').addEventListener('click', () => location.reload());
 document.getElementById('det-again').addEventListener('click', () => location.reload());
 
@@ -839,7 +867,17 @@ function tick(dt) {
       hud.say(['Bhaiya, ek cutting chai!', 'Kisi ladke ko dekha idhar?', 'Aaj bahut thand hai, Bhaiya.'][Math.floor(Math.random() * 3)], wardenHead, '');
       setTimeout(() => hud.say(['Abhi lo, Saab!', 'Nahi Saab, koi nahi aaya.', 'Haan Saab, adrak daal doon?'][Math.floor(Math.random() * 3)], bhaiyaHead, '', 'Bhaiya'), 1600);
     }
-    minutes += dt * MINUTES_PER_SECOND;
+    // The tutorial: one step at a time, with an arrow over what to use.
+    if (tutorial.active) {
+      if (input.tapped('KeyT')) endTutorial();
+      else {
+        const tu = tutorial.update(dt, { player, jug, map });
+        if (tu?.advanced) { sfx.sting('got'); hud.tutorialTick(); }
+        if (tu?.finished) endTutorial();
+        else if (tu) { hud.setTutorial(tu.text, tu.n, tutorial.total); placeMarker(tu.marker); }
+      }
+    }
+    if (!tutorial.freezeClock) minutes += dt * MINUTES_PER_SECOND;
     if (minutes >= CLOSING - 15 && !warned15) { warned15 = true; hud.toast('⏰ 15 minute bache! Maggi Point 3 baje band.'); }
     if (minutes >= CLOSING && state === 'playing' && jug.maggi.state === 'none') tooLate();
     readyBowl.visible = jug.maggi.state === 'ready';
