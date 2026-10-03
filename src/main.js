@@ -1,10 +1,10 @@
 // Boots the game: renderer, scene, the loop, and the glue between you,
 // Warden Saab, the jugaad rules and the screen.
 import * as THREE from 'three';
-import { createMap, WARDEN_START, WARDEN_ROUTE, areaName } from '../shared/map.js';
+import { createMap, WARDEN_START, WARDEN_ROUTE, OUTSIDE_ROUTE, inMyRoom, areaName } from '../shared/map.js';
 import { createWarden, updateWarden, resumePatrol, sendWarden } from '../shared/warden-ai.js';
 import {
-  ITEMS, MY_DOOR, CANTEEN, createJugaad, actionsFor, perform, lockedHint, combine, recipeFor,
+  ITEMS, MY_DOOR, SMELL_R, loseMaggi, createJugaad, actionsFor, perform, lockedHint, combine, recipeFor,
   selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateHeld, tailgated, score,
   startAct2, restorePower, STUDY_CIRCLES, FUSE_BOX,
 } from '../shared/jugaad.js';
@@ -16,6 +16,7 @@ import { createChowkidarModel } from './render/chowkidar.js';
 import { createWorldItems } from './render/items.js';
 import { createViewmodel, ACTION_ANIM } from './render/viewmodel.js';
 import { createBhaiya } from './render/bhaiya.js';
+import { makeItemModel } from './render/props.js';
 import { inkBox, canvasTexture } from './render/toon.js';
 import { createInput, isTouch } from './input.js';
 import { createPlayer, updatePlayer, respawn, forward, RADIUS } from './player.js';
@@ -113,6 +114,18 @@ const torchTarget = new THREE.Object3D();
 torchTarget.position.set(0, -0.6, -6);
 camera.add(torch, torchTarget);
 torch.target = torchTarget;
+// Your Maggi, waiting on the counter when it's ready, and on your desk in the last comic.
+const readyBowl = makeItemModel('maggi');
+readyBowl.scale.setScalar(1.8);
+readyBowl.position.set(37.3, 0.96, 18.3);
+readyBowl.visible = false;
+scene.add(readyBowl);
+const plate = makeItemModel('maggi');
+plate.scale.setScalar(1.5);
+plate.position.set(1.55, 0.76, 9.45);
+plate.visible = false;
+scene.add(plate);
+
 // Bhaiya, at his stall.
 const bhaiya = createBhaiya(scene);
 const bhaiyaHead = () => bhaiya.headWorld();
@@ -129,6 +142,7 @@ let prevX = player.x;
 let wasSeated = false;
 let warned15 = false;
 let canUseNow = false;
+let smellT = 0, chaiT = 0, torchAway = false, orderedAt = START_MINUTES;
 
 let sizeW = 0, sizeH = 0;
 function resize() {
@@ -240,7 +254,21 @@ function objective() {
     if (jug.power.on) return 'Bijli wapas! Study circle mein chhupo, ya kettle + press + heater se fuse udaao. Phir: chowkidar ki chaabi.';
     return 'Main gate ki chaabi soye chowkidar ki belt pe hai. Ya lobby ki dheeli khidki...';
   }
-  return 'Gate khul gaya! Bhaiya ki Maggi Point tak bhaago!';
+  const m = jug.maggi;
+  if (m.state === 'none') return 'Bahar niklo! Bhaiya ki Maggi Point pe order do (counter pe E).';
+  if (m.state === 'cooking') return `Maggi ban rahi hai (${Math.ceil(m.t)}s). Warden Saab bahar ghoom rahe hain: andhere mein chhupo, lantern ke paas mat ruko!`;
+  if (m.state === 'ready') return 'MAGGI READY! Counter se utha lo.';
+  if (inMyRoom(player.x, player.z)) return 'Darwaza band karo, phir chupke se khao (E dabaye rakho). Slurp ki awaaz aati hai!';
+  return 'Maggi lekar Room 106 wapas jao. Bhaago mat (garam hai!). Paas aaye toh Warden Saab ko khushboo aa jayegi...';
+}
+
+// While your Maggi cooks (or waits on the counter) he does his rounds outside.
+const routeFor = () => (jug.maggi.state === 'cooking' || jug.maggi.state === 'ready' ? OUTSIDE_ROUTE : WARDEN_ROUTE);
+function switchRoute() {
+  const r = routeFor();
+  if (warden.route === r) return;
+  warden.route = r;
+  if (warden.mode === 'patrol') resumePatrol(warden);
 }
 
 function getCaught() {
@@ -253,10 +281,14 @@ function getCaught() {
   buzz([120, 60, 220]);
   jug.seated = null;
   sfx.setTension(0);
-  const taken = confiscateHeld(jug);
-  document.getElementById('caught-line').textContent = `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
-  document.getElementById('caught-taken').textContent = taken
-    ? `${ITEMS[taken].icon} ${ITEMS[taken].name} confiscate! (Uski almirah mein gaya...)` : '';
+  const lostMaggi = loseMaggi(jug);
+  const taken = lostMaggi ? null : confiscateHeld(jug);
+  document.getElementById('caught-line').textContent = lostMaggi
+    ? '"Ye Maggi? Ye toh main khaunga. CONFISCATED!"'
+    : `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
+  document.getElementById('caught-taken').textContent = lostMaggi
+    ? '🍜 Maggi gayi! Phir se order karna padega.'
+    : taken ? `${ITEMS[taken].icon} ${ITEMS[taken].name} confiscate! (Uski almirah mein gaya...)` : '';
   const left = CHANCES - caughtCount;
   document.getElementById('caught-count').innerHTML = `<span class="bowls">${'🍜'.repeat(left)}<i>${'🍜'.repeat(caughtCount)}</i></span> Chances bache: <b>${left}</b>`;
   document.getElementById('caught-warn').textContent = left === 1 ? 'Ek aur baar... aur PAPA KO PHONE!' : '';
@@ -341,6 +373,7 @@ function backToRoom() {
   if (!myDoor.locked) myDoor.open = false;
   // He marches back to his desk to write your name in the register.
   warden.x = WARDEN_ROUTE[0].x; warden.z = WARDEN_ROUTE[0].z;
+  warden.route = routeFor();
   resumePatrol(warden);
   hud.clearBubbles();
   startPlaying();
@@ -352,10 +385,10 @@ async function win() {
   jug.seated = null;
   document.exitPointerLock?.();
   sfx.setTension(0);
-  if (!window.__skipComics) await playComic(endingPanels(), { title: 'Maggi Point, raat 2 baje ke baad...' });
+  if (!window.__skipComics) await playComic(roomPanels(), { title: 'Room 106, raat ke 3 baje...' });
   state = 'won';
-  const left = Math.max(0, Math.floor(CLOSING - minutes));
-  if (left > 0) jug.log.push({ text: `Band hone se ${left} minute pehle pahunche`, kind: 'time', points: left * 4 });
+  const left = Math.max(0, Math.floor(CLOSING - orderedAt));
+  if (left > 0) jug.log.push({ text: `Band hone se ${left} minute pehle order diya`, kind: 'time', points: left * 4 });
   const s = score(jug, caughtCount);
   const best = store.get('best', 0);
   if (s.total > best) store.set('best', s.total);
@@ -374,7 +407,7 @@ async function win() {
   document.getElementById('score-total').textContent = s.total;
   document.getElementById('score-title').textContent = s.title;
   const h = Math.floor(minutes / 60), m = Math.floor(minutes % 60);
-  document.getElementById('score-time').textContent = `Maggi Point pahunche: ${h}:${String(m).padStart(2, '0')} AM`;
+  document.getElementById('score-time').textContent = `Maggi khatam: ${h}:${String(m).padStart(2, '0')} AM. Warden Saab ko pata bhi nahi chala.`;
   sfx.sting('alert');
   showOverlay('won');
 }
@@ -407,8 +440,24 @@ function handle(events, noises) {
       if (e.who === 'warden') { hud.say(e.line, wardenHead, 'alert'); wardenModel.setMood('angry'); }
       else if (e.who === 'chowkidar') hud.say(e.line, chowHead, /CHOR/.test(e.line) ? 'angry' : '', 'Chowkidar');
       else if (e.who === 'student') hud.say(e.line, v3(e.x, 1.2, e.z), '', 'Student');
+      else if (e.who === 'bhaiya') hud.say(e.line, bhaiyaHead, /READY/.test(e.line) ? 'alert' : '', 'Bhaiya');
       else hud.say(e.line, v3(e.x, 2.1, e.z), 'angry', 'Kamre se awaaz');
     } else if (e.type === 'power') powerChanged(e);
+    else if (e.type === 'act3') {
+      orderedAt = minutes;
+      hud.bigPop('DO MINUTE!');
+      hud.subtitle('Order de diya! Ab 2 minute chhupo. Warden Saab bahar raund pe nikal rahe hain...', 5);
+      switchRoute();
+    } else if (e.type === 'maggiReady') {
+      hud.toast('🍜 Maggi ready! Counter pe rakhi hai.');
+      buzz([40, 40, 40]);
+      switchRoute();
+    } else if (e.type === 'carrying') {
+      hud.subtitle('Ab Room 106! Bhaago mat, garam hai. Aur khushboo... door se aati hai.', 5);
+      switchRoute();
+    } else if (e.type === 'won') {
+      win();
+    }
   }
 }
 
@@ -494,10 +543,15 @@ function inventoryKeys() {
 
 // ---- E: look, act, hold
 function interact(dt, noises) {
-  const target = jug.seated
+  let target = jug.seated
     ? { type: 'circle', circle: jug.seated, dist: 0.5, at: jug.seated.seat, key: `circle:${jug.seated.id}` }
     : findTarget(player, jug);
   let actions = target ? actionsFor(jug, target, { dist: target.dist, inside: target.inside, crouch: player.crouch }) : [];
+  // Back in your room with the Maggi: E eats it (unless you are at the door, to shut it first).
+  if (jug.inv.includes('maggi') && inMyRoom(player.x, player.z) && !(target && target.type === 'door' && actions.length)) {
+    target = { type: 'eat', dist: 0, at: { x: player.x, z: player.z }, key: 'eat' };
+    actions = actionsFor(jug, target);
+  }
   if (target && target.type === 'door' && target.door.kind === 'D' && actions[0]?.id === 'toggle' && target.door.open && playerInDoor(target.door)) {
     actions = [];
   }
@@ -529,8 +583,10 @@ function interact(dt, noises) {
     hold.noiseT += dt;
     if (action.noise && hold.noiseT > 1) {
       hold.noiseT = 0;
-      noises.push({ x: target.at.x, z: target.at.z, r: action.noise });
-      hud.sfx(action.id === 'pickGrill' ? 'khat-khut' : 'khrr', v3(target.at.x, 1.2, target.at.z), 0.6, 0.6);
+      const eating = action.id === 'eat';
+      noises.push({ x: target.at.x, z: target.at.z, r: action.noise, line: eating ? 'Ye slurp-slurp kaun kar raha hai?!' : undefined });
+      hud.sfx(eating ? 'SLURRP' : action.id === 'pickGrill' ? 'khat-khut' : 'khrr', v3(target.at.x, 1.2, target.at.z), 0.6, 0.6);
+      if (eating) sfx.slurp();
     }
     if (action.id === 'grabKeys') grabTick(jug, dt, player.crouch);
     if (hold.t >= action.hold) {
@@ -571,6 +627,19 @@ function updateTouchButtons(canUse) {
   }
   TB.use.style.setProperty('--p', `${Math.round((hold ? hold.t / hold.action.hold : 0) * 100)}%`);
 }
+let chipText = '';
+function updateMaggiChip() {
+  const m = jug.maggi;
+  const secs = Math.ceil(m.t);
+  const t = m.state === 'cooking' ? `🍜 ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+    : m.state === 'ready' ? '🍜 READY!' : m.state === 'carried' ? '🍜 HAATH MEIN' : '';
+  if (t === chipText) return;
+  chipText = t;
+  maggiChip.textContent = t;
+  maggiChip.hidden = !t;
+  maggiChip.classList.toggle('ready', m.state === 'ready');
+}
+const maggiChip = document.getElementById('maggi-chip');
 function buzz(pattern) { if (isTouch) try { navigator.vibrate?.(pattern); } catch { /* no vibration */ } }
 
 // Leaving the app (or locking the phone) pauses the game.
@@ -621,28 +690,20 @@ function openingPanels() {
   ];
 }
 
-function endingPanels() {
-  const lanternWas = world.lantern.intensity;
-  const pose = (look, pushed) => () => {
-    world.lantern.intensity = 4.5;
-    wardenModel.group.visible = false;
-    cutWarden.group.visible = true;
-    cutWarden.update({ x: 36.15, z: 17.6, yaw: 0, lookOffset: look, moving: false, mode: 'patrol', meter: 0 }, 0);
-    bowls.forEach((b) => { b.visible = true; });
-    bowls[1].position.set(pushed ? 35.2 : 35.5, 0.95, pushed ? 18.15 : 18.35);
-  };
-  const p1 = shot({ pos: [36.0, 1.65, 14.4], at: [36, 1.3, 18.3], setup: pose(0, false) });
-  const p2 = shot({ pos: [33.9, 1.55, 16.4], at: [36.1, 1.2, 18.0], fov: 50, setup: pose(0, false) });
-  const p3 = shot({ pos: [35.0, 1.55, 16.2], at: [36.1, 1.55, 17.6], fov: 40, setup: pose(-2, false) });
-  const p4 = shot({ pos: [34.8, 1.6, 16.6], at: [35.7, 1.15, 17.9], fov: 50, setup: pose(-1.6, true) });
-  cutWarden.group.visible = false;
-  bowls.forEach((b) => { b.visible = false; });
-  world.lantern.intensity = lanternWas;
+// The winning comic: eating in the dark while he walks past the door.
+function roomPanels() {
+  const show = (v) => () => { plate.visible = v; };
+  const desk = { pos: [3.9, 1.45, 11.9], at: [1.4, 0.8, 9.4] };
+  const p1 = shot({ ...desk, power: 0, lamp: 0.7, setup: show(true) });
+  const p2 = shot({ pos: [2.5, 1.5, 11.3], at: [2.5, 1.0, 8.2], power: 0, lamp: 0.7, setup: show(true) });
+  const p3 = shot({ pos: [2.35, 1.12, 10.15], at: [1.6, 0.8, 9.45], fov: 40, power: 0, lamp: 1.0, setup: show(true) });
+  const p4 = shot({ pos: [2.5, 1.5, 11.3], at: [2.5, 1.0, 8.2], power: 0, lamp: 0.7, setup: show(true) });
+  plate.visible = false;
   return [
-    { img: p1, caption: 'Maggi Point. Finally.', bubbles: [{ text: 'Bhaiya! Ek plate Maggi, DOUBLE masala!', x: 8, y: 14, shout: true }] },
-    { img: p2, caption: 'Counter pe pehle se koi khada hai...', sfx: { text: 'SLURRRRP', x: 50, y: 30, rot: -10 } },
-    { img: p3, caption: 'Woh. Yahan. Bhi.', bubbles: [{ text: '.....', x: 56, y: 12 }] },
-    { img: p4, caption: 'Warden Saab ne plate aage sarkaayi.', bubbles: [{ text: 'Paper kal hai na? Jaldi kha, phir so ja.', x: 30, y: 10 }] },
+    { img: p1, dim: false, caption: 'Room 106. Darwaza band. Torch band.', sfx: { text: 'SLURRRP', x: 56, y: 40, rot: -8 }, bubbles: [{ text: 'Zindagi ke sabse lambe do minute the...', x: 46, y: 10 }] },
+    { img: p2, dim: true, caption: 'Bahar... chappal ki awaaz.', sfx: { text: 'thap... thap...', x: 8, y: 72, rot: 4 }, bubbles: [{ text: 'Hmm... ye Maggi ki khushboo...?', x: 36, y: 14, shout: true }] },
+    { img: p3, caption: 'Saans roko.', bubbles: [{ text: '.....', x: 60, y: 12 }] },
+    { img: p4, dim: true, caption: 'Maggi ke liye... KUCH BHI.', sfx: { text: 'BURRRP!', x: 12, y: 60, rot: -10 }, bubbles: [{ text: 'Chooha hoga. Hmph.', x: 40, y: 14, shout: true }] },
   ];
 }
 
@@ -694,7 +755,18 @@ function tick(dt) {
       player.crouch = false;
     }
     if (input.tapped('KeyP', 'Escape') || (isTouch && portrait.matches)) { pause(); input.endFrame(); return; }
-    const noises = updatePlayer(player, dt, input, map, 0.0022 * sensitivity);
+    const carrying = jug.inv.includes('maggi');
+    if (carrying && input.tapped('ShiftLeft', 'ShiftRight')) hud.subtitle('Garam Maggi leke bhaagoge? Gir jayegi!', 2);
+    const noises = updatePlayer(player, dt, input, map, 0.0022 * sensitivity, { noRun: carrying });
+    // The smell of Maggi travels: he notices it if he gets close.
+    if (carrying) {
+      smellT -= dt;
+      if (smellT <= 0) { smellT = 1; noises.push({ x: player.x, z: player.z, r: SMELL_R, line: 'Ye... Maggi ki khushboo?!' }); }
+    }
+    // The stall's lantern lights you up; indoors the tube lights do (when the power is on).
+    player.lit = Math.hypot(player.x - 36, player.z - 18.2) < 3.3;
+    warden.lightsOn = jug.power.on && warden.z < 13.2 && player.z < 13.2;
+    if (warden.lightsOn !== torchAway) { torchAway = warden.lightsOn; wardenModel.setTorch(!torchAway); }
     if (jug.seated) {
       if (!wasSeated) { player.yaw = jug.seated.yaw; player.pitch = -0.3; }
       player.x = jug.seated.seat.x; player.z = jug.seated.seat.z;
@@ -714,6 +786,7 @@ function tick(dt) {
     noises.push(...pendingNoises.splice(0));
     inventoryKeys();
     interact(dt, noises);
+    if (state !== 'playing') { input.endFrame(); return; }   // the last bite just won the game
     updateTouchButtons(canUseNow);
 
     // Slipping through the grill while he holds it open.
@@ -759,11 +832,19 @@ function tick(dt) {
       }
     }
 
-    if (Math.hypot(player.x - CANTEEN.x, player.z - CANTEEN.z) < CANTEEN.r) win();
+    // Chai at the stall: a little scene while he loiters there.
+    chaiT -= dt;
+    if (chaiT <= 0 && warden.mode === 'patrol' && Math.hypot(warden.x - 35.5, warden.z - 16.8) < 1.2) {
+      chaiT = 25;
+      hud.say(['Bhaiya, ek cutting chai!', 'Kisi ladke ko dekha idhar?', 'Aaj bahut thand hai, Bhaiya.'][Math.floor(Math.random() * 3)], wardenHead, '');
+      setTimeout(() => hud.say(['Abhi lo, Saab!', 'Nahi Saab, koi nahi aaya.', 'Haan Saab, adrak daal doon?'][Math.floor(Math.random() * 3)], bhaiyaHead, '', 'Bhaiya'), 1600);
+    }
     minutes += dt * MINUTES_PER_SECOND;
     if (minutes >= CLOSING - 15 && !warned15) { warned15 = true; hud.toast('⏰ 15 minute bache! Maggi Point 3 baje band.'); }
-    if (minutes >= CLOSING && state === 'playing') tooLate();
-    hud.setObjective(objective(), minutes >= CLOSING - 15);
+    if (minutes >= CLOSING && state === 'playing' && jug.maggi.state === 'none') tooLate();
+    readyBowl.visible = jug.maggi.state === 'ready';
+    hud.setObjective(objective(), minutes >= CLOSING - 15 && jug.maggi.state === 'none');
+    updateMaggiChip();
     input.endFrame();
   } else {
     hud.setPrompt(null);

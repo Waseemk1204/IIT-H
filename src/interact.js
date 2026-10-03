@@ -43,6 +43,7 @@ export function findTarget(player, st) {
     const circle = st.circleByCell.get(k);
     if (circle && st.act === 2) return { type: 'circle', circle, dist: d, at: { x: cx + 0.5, z: cz + 0.5 }, key: `circle:${circle.id}` };
     if (k === BOARD.cell) return { type: 'board', dist: d, at: { x: BOARD.x, z: BOARD.z }, key: 'board' };
+    if (map.cells[cz]?.[cx] === 'Q') return { type: 'counter', dist: d, at: { x: cx + 0.5, z: cz + 0.5 }, key: 'counter' };
     const cont = st.byCell.get(k);
     if (cont) return { type: 'container', container: cont, dist: d, at: { x: cx + 0.5, z: cz + 0.5 }, key: `cont:${cont.id}` };
     if (solidForPlayer(map, cx, cz)) return null;

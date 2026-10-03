@@ -374,3 +374,6 @@ body.touch #prompt small { font-size: 11px; }
 .det-panel .boom { color: var(--red); }
 #det-lines { font-weight: 700; font-size: 18px; }
 body.touch #chances { font-size: 12px; }
+#maggi-chip { background: var(--yellow); }
+#maggi-chip.ready { background: var(--red); color: var(--paper); animation: shake .3s infinite; }
+#maggi-chip[hidden] { display: none; }

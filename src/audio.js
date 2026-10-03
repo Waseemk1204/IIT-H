@@ -242,3 +242,10 @@ function music() {
 
 export function suspend() { ctx?.suspend(); }
 export function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
+
+// Eating noodles as quietly as you can (which is not very).
+export function slurp() {
+  if (!ctx) return;
+  const o = out(0, 0.7);
+  for (let i = 0; i < 3; i++) noiseBurst(o, { dur: 0.12, freq: 1800 - i * 400, q: 4, vol: 0.4, at: i * 0.09 });
+}

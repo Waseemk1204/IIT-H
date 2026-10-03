@@ -22,7 +22,7 @@ export function respawn(p, spawn) {
 }
 
 // Returns noises made this frame: [{ x, z, r, kind }].
-export function updatePlayer(p, dt, input, map, sensitivity = 0.0022) {
+export function updatePlayer(p, dt, input, map, sensitivity = 0.0022, { noRun = false } = {}) {
   const m = input.look();
   p.lastLook = m;
   p.yaw -= m.x * sensitivity;
@@ -41,7 +41,7 @@ export function updatePlayer(p, dt, input, map, sensitivity = 0.0022) {
   let analog = 1;
   if (Math.hypot(ax.x, ax.y) > 0.15) { fx = ax.x; fz = ax.y; analog = Math.min(1, Math.hypot(ax.x, ax.y)); }
   const len = Math.hypot(fx, fz);
-  p.running = input.held('ShiftLeft', 'ShiftRight') && len > 0 && fz < 0;
+  p.running = !noRun && input.held('ShiftLeft', 'ShiftRight') && len > 0 && fz < 0;
   if (p.running) p.crouch = false;
   const gait = p.crouch ? 'crouch' : p.running ? 'run' : 'walk';
 

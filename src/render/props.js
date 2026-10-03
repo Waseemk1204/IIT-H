@@ -145,6 +145,25 @@ const MAKERS = {
     g.add(wire([[-0.11, 0.05, 0], [-0.2, 0.0, 0], [-0.26, -0.08, 0]], 0.004, 0x111111));
     return g;
   },
+  maggi() {
+    const g = new THREE.Group();
+    const bowl = inkMesh(new THREE.CylinderGeometry(0.08, 0.05, 0.05, 18), 0xf2f2ee, 0.004);
+    bowl.position.y = 0.025;
+    g.add(bowl);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.072, 0.012, 18), toon(0xf0c33c));
+    top.position.y = 0.05;
+    g.add(top);
+    for (let i = 0; i < 5; i++) {          // a few curly strands on top
+      const c = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.004, 5, 12, Math.PI * 1.4), toon(0xe9b52a));
+      c.position.set(Math.cos(i * 1.3) * 0.035, 0.058, Math.sin(i * 1.3) * 0.035);
+      c.rotation.set(Math.PI / 2, 0, i);
+      g.add(c);
+    }
+    const fork = inkBox(0.008, 0.012, 0.13, STEEL, 0.03, 0.05, -0.04, 0.001);
+    fork.rotation.set(-0.5, 0.4, 0);
+    g.add(fork);
+    return g;
+  },
   heater() {
     const g = new THREE.Group();
     g.add(inkBox(0.26, 0.22, 0.06, 0x6d6d64, 0, 0, 0, 0.004));
@@ -193,4 +212,5 @@ export const GRIP = {
   kettle:    { p: [0, -0.1, -0.03], r: [0, 0.6, 0], s: 0.7 },
   iron:      { p: [0, -0.06, -0.04], r: [0, Math.PI / 2, 0], s: 0.8 },
   heater:    { p: [0, -0.12, -0.05], r: [0, 0.3, 0], s: 0.6 },
+  maggi:     { p: [-0.03, -0.03, -0.07], r: [0.25, 0, 0], s: 0.75 },
 };

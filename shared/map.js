@@ -58,6 +58,23 @@ export const WARDEN_ROUTE = [
   { x: 36.5, z: 10.5, wait: 3, look: 0 },
 ];
 
+// Act 3: while your Maggi cooks, he walks the compound instead (and stops
+// at the stall for chai).
+export const OUTSIDE_ROUTE = [
+  { x: 32.5, z: 11.5, wait: 1, look: 0 },
+  { x: 32.5, z: 15.0, wait: 2, look: -Math.PI / 2 },   // just outside the gate
+  { x: 20.5, z: 15.5, wait: 2, look: 0 },
+  { x: 8.5, z: 16.0, wait: 3, look: Math.PI },
+  { x: 8.5, z: 19.5, wait: 2, look: Math.PI / 2 },
+  { x: 22.5, z: 19.5, wait: 1, look: Math.PI / 2 },
+  { x: 30.5, z: 17.0, wait: 3, look: Math.PI / 2 },
+  { x: 35.5, z: 16.8, wait: 6, look: 0 },             // at the stall: "Bhaiya, ek chai!"
+  { x: 40.0, z: 15.0, wait: 2, look: Math.PI },
+];
+
+// Your room, where the Maggi has to be eaten.
+export const inMyRoom = (x, z) => x > 1 && x < 5 && z > 8.6 && z < 13;
+
 export function createMap(rows = ROWS) {
   const h = rows.length;
   const w = rows[0].length;

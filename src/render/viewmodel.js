@@ -16,6 +16,7 @@ export const ACTION_ANIM = {
   slidePaper: 'slide', pokeKey: 'poke', pullPaper: 'pull', unlock106: 'twist', vent: 'reachUp',
   pickGrill: 'pick', smashGrill: 'swing', smashWindow: 'swing', hookKeys: 'hook', grabKeys: 'grab',
   unlockMain: 'twist', borrowBook: 'grab', plug: 'push',
+  order: 'press', takeMaggi: 'grab', eat: 'eat',
 };
 
 const ease = (k) => k * k * (3 - 2 * k);
@@ -50,6 +51,8 @@ const POSES = {
     return [0.04 - 0.1 * e, 0.12 - 0.05 * e, 0.12 - 0.42 * e, 0.8 - 1.6 * e, 0, 0];
   },
   drop: (k) => [0, -0.3 * ease(k), 0, -0.4 * k, 0, 0],
+  // bowl up under your chin, slurping
+  eat: (k, t) => [-0.13, 0.11 + Math.sin(t * 9) * 0.015, 0.06, 0.55 + Math.sin(t * 9) * 0.08, -0.3, Math.sin(t * 4.5) * 0.05],
   equip: (k) => [0, -0.3 * (1 - ease(k)), 0, -0.6 * (1 - ease(k)), 0, 0],
   combine: (k) => { const e = ease(Math.min(1, k / 0.55)); const shake = k > 0.55 && k < 0.75 ? Math.sin(k * 120) * 0.02 : 0; return [-0.17 * e + shake, 0.1 * e, -0.16 * e, 0.3 * e, -0.5 * e, 0]; },
 };

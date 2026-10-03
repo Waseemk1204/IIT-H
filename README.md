@@ -69,7 +69,14 @@ caught and whatever you are holding goes into the warden's almirah (you can stea
 You get **five chances**: the HUD shows five bowls of Maggi, and each catch takes one. The
 fifth time, Warden Saab rings your parents ("KYAAA?! Exam se pehle?!") and the night ends
 in detention, writing "Lights off = SONA" until 6 AM while he eats your Maggi.
-Reach the Maggi stall for the score card: improvised answers beat sneaky ones, which beat
+**The last act:** reach Bhaiya's stall and order (before 3 AM). Maggi takes two real
+minutes, and while it cooks Warden Saab does his rounds out in the compound, stops at the
+stall for chai, and the stall's lantern lights up anyone waiting at the counter: hide in
+the dark. Bhaiya shouts when it's ready. Then carry the steaming plate back to Room 106:
+you can't run with it, and if Warden Saab gets within about three metres he smells it. In
+your room, shut the door and hold E to eat; the slurping carries, so wait for him to pass.
+Get caught with the plate and he eats it; you have to order again.
+Finish the plate for the score card: improvised answers beat sneaky ones, which beat
 keys, which beat brute force.
 
 **Phase 3 (done):** the twist. Get through the grill gate and the power comes back: tube
@@ -131,3 +138,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | 3D item models, first-person hands with use animations (rummage, pick, swing, throw, combine, twist...), Bhaiya the Maggi wala NPC with steam and call-outs. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Comic pages that fit the screen, full screen buttons, phone optimisation (static mesh merging, lite lighting, adaptive resolution, contextual touch buttons, haptics), portrait blocked. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Five chances with a HUD counter and last-chance warning; the parents-call and detention comic ending. |
+| 3 Oct 2026 | Claude Code (Anthropic) | New win: order at the stall, hide for two minutes while the warden patrols outside, carry the Maggi back (smell, no running), eat it in Room 106; new ending comic. |

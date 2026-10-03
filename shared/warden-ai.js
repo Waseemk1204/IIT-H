@@ -67,8 +67,9 @@ export function sightRate(w, p, map) {
   if (p.hidden && w.mode !== 'chase' && dist > 1.2) return 0;
   if (!lineOfSight(map, w.x, w.z, p.x, p.z, { targetCrouched: p.crouch })) return 0;
   let rate = 0;
-  if (w.lightsOn) {
-    // Tube lights on: no shadows to hide in. He sees anything in front of him.
+  if (w.lightsOn || p.lit) {
+    // Tube lights on (or you are standing in the stall's lantern light):
+    // no shadows to hide in. He sees anything in front of him.
     if (bodyOff < 1.2) rate = 0.3 + 1.3 * Math.max(0, 1 - dist / 15) ** 1.5;
     else if (dist < 2.2 && bodyOff < 1.6) rate = 0.9;
     if (p.crouch) rate *= 0.7;
@@ -205,7 +206,7 @@ export function updateWarden(w, dt, player, noises = []) {
           if (!setPath(w, n.x, n.z)) w.mode = 'search';
         }
         w.searchT = 0;
-        if (fresh) events.push({ type: 'say', line: n.r > 5 ? 'Kya awaaz thi?!' : 'Hmm? Koi hai?', mood: 'alert' });
+        if (fresh) events.push({ type: 'say', line: n.line || (n.r > 5 ? 'Kya awaaz thi?!' : 'Hmm? Koi hai?'), mood: 'alert' });
         break;
       }
     }
