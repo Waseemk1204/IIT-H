@@ -1,0 +1,13 @@
+{
+  "name": "maggie-ke-liye-kuch-bhi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A comic jugaad stealth game: one power cut, one strict warden, one plate of Maggi.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "for f in shared/*.js src/*.js src/**/*.js server.mjs; do node --check \"$f\" || exit 1; done"
+  },
+  "license": "UNLICENSED"
+}

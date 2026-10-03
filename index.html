@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Maggie ke liye kuch bhi!</title>
+  <meta name="description" content="A comic jugaad stealth game: one power cut, one strict warden, one plate of Maggi.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    { "imports": { "three": "./assets/vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="halftone"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="status-left" class="chip"><span id="clock">1:30 AM</span><span id="area">Room 106</span></div>
+    <div id="status-right"><span id="stance" class="chip">WALKING</span><span id="torch-state" class="chip">TORCH OFF</span></div>
+    <div id="meter"><span id="meter-label">Kuch dikha?</span><div id="meter-bar"><div id="meter-fill"></div></div></div>
+    <div id="crosshair"></div>
+    <div id="prompt"></div>
+    <div id="subtitle"></div>
+    <div id="bubbles"></div>
+  </div>
+
+  <!-- Title -->
+  <section id="title" class="overlay">
+    <div class="panel cover">
+      <p class="kicker">Load-shedding presents</p>
+      <h1>MAGGIE KE LIYE<br><span>KUCH BHI!</span></h1>
+      <p class="blurb">1:30 AM. Endsem kal hai. The hostel gate has been locked since 11, your stomach is
+        growling, and the whole block just went dark. Bhaiya's Maggi Point is open till 3.
+        Warden Saab is awake, and he has a torch.</p>
+      <button id="start" class="btn">CHUPKE SE NIKLO →</button>
+      <div class="controls">
+        <span><b>WASD</b> move</span><span><b>Mouse</b> look</span><span><b>Shift</b> run (loud!)</span>
+        <span><b>C</b> crouch</span><span><b>F</b> phone torch</span><span><b>E</b> doors</span>
+        <span><b>P</b> pause</span><span><b>M</b> mute</span>
+      </div>
+      <p class="tips">Darkness hides you. His torch beam doesn't. Neither does yours.</p>
+      <p class="fine">Phase 1 build · IIT-H Game Jam · AI-assisted, see README</p>
+    </div>
+  </section>
+
+  <!-- Pause -->
+  <section id="pause" class="overlay">
+    <div class="panel small">
+      <h2>RUKO ZARA...</h2>
+      <p>Game paused.</p>
+      <button id="resume" class="btn">WAPAS CHALO</button>
+    </div>
+  </section>
+
+  <!-- Caught -->
+  <section id="caught" class="overlay">
+    <div class="panel caught-panel">
+      <div class="boom">PAKDE GAYE!</div>
+      <p id="caught-line" class="speech"></p>
+      <p id="caught-count"></p>
+      <p class="fine">Click or press any key to go back to your room</p>
+    </div>
+  </section>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
