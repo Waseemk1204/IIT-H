@@ -84,7 +84,7 @@ export const STUDY_CIRCLES = [
 export const BOARD = { x: 33.5, z: 4.5, cell: '33,4' };
 export const FUSE_BOX = { x: 36.5, z: 1.5 };     // in the warden's room
 export const POWER_FALLBACK = 60;                 // seconds until someone fixes it anyway
-export const MAGGI_TIME = 120;                    // "do minute", for real
+export const MAGGI_TIME = 60;                     // one real minute
 export const SMELL_R = 3.2;                       // how close he has to be to smell it
 export const EAT_TIME = 6;
 
@@ -447,7 +447,7 @@ export function perform(st, target, action, ctx = {}) {
       st.maggi = { state: 'cooking', t: MAGGI_TIME };
       // He went out to do his rounds and left the grill open behind him.
       for (const d of map.doors.values()) if (d.kind === 'G') { d.locked = false; d.open = true; d.byWarden = false; }
-      ev.push({ type: 'say', who: 'bhaiya', line: 'Do minute! Bas do minute...' });
+      ev.push({ type: 'say', who: 'bhaiya', line: 'Ek minute! Bas ek minute...' });
       ev.push({ type: 'act3' });
       break;
     }

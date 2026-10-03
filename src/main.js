@@ -445,8 +445,8 @@ function handle(events, noises) {
     } else if (e.type === 'power') powerChanged(e);
     else if (e.type === 'act3') {
       orderedAt = minutes;
-      hud.bigPop('DO MINUTE!');
-      hud.subtitle('Order de diya! Ab 2 minute chhupo. Warden Saab bahar raund pe nikal rahe hain...', 5);
+      hud.bigPop('EK MINUTE!');
+      hud.subtitle('Order de diya! Ab ek minute chhupo. Warden Saab bahar raund pe nikal rahe hain...', 5);
       switchRoute();
     } else if (e.type === 'maggiReady') {
       hud.toast('🍜 Maggi ready! Counter pe rakhi hai.');
@@ -700,7 +700,7 @@ function roomPanels() {
   const p4 = shot({ pos: [2.5, 1.5, 11.3], at: [2.5, 1.0, 8.2], power: 0, lamp: 0.7, setup: show(true) });
   plate.visible = false;
   return [
-    { img: p1, dim: false, caption: 'Room 106. Darwaza band. Torch band.', sfx: { text: 'SLURRRP', x: 56, y: 40, rot: -8 }, bubbles: [{ text: 'Zindagi ke sabse lambe do minute the...', x: 46, y: 10 }] },
+    { img: p1, dim: false, caption: 'Room 106. Darwaza band. Torch band.', sfx: { text: 'SLURRRP', x: 56, y: 40, rot: -8 }, bubbles: [{ text: 'Zindagi ka sabse lamba ek minute tha...', x: 46, y: 10 }] },
     { img: p2, dim: true, caption: 'Bahar... chappal ki awaaz.', sfx: { text: 'thap... thap...', x: 8, y: 72, rot: 4 }, bubbles: [{ text: 'Hmm... ye Maggi ki khushboo...?', x: 36, y: 14, shout: true }] },
     { img: p3, caption: 'Saans roko.', bubbles: [{ text: '.....', x: 60, y: 12 }] },
     { img: p4, dim: true, caption: 'Maggi ke liye... KUCH BHI.', sfx: { text: 'BURRRP!', x: 12, y: 60, rot: -10 }, bubbles: [{ text: 'Chooha hoga. Hmph.', x: 40, y: 14, shout: true }] },

@@ -10,7 +10,7 @@ const fresh = () => { const map = createMap(); return { map, st: createJugaad(ma
 const counter = { type: 'counter', at: { x: 35.5, z: 18.5 } };
 const away = { x: 2.5, z: 10.5, crouch: false, torch: false };
 
-test('order, wait two minutes, take it, eat it in your room', () => {
+test('order, wait a minute, take it, eat it in your room', () => {
   const { map, st } = fresh();
   let ev = perform(st, counter, actionsFor(st, counter)[0]);
   assert.equal(st.maggi.state, 'cooking');

@@ -19,7 +19,7 @@ const gamchha = canvasTexture(32, 32, (ctx, w, h) => {
 
 const CALLS = [
   'Garma garam Maggi!', 'Aaja bhai, last order!', 'Double masala? Ho jayega!',
-  'Do minute... sach mein do minute!', 'Cheese daalun?', 'Exam hai? Maggi khao, sab aayega!',
+  'Ek minute... sach mein ek minute!', 'Cheese daalun?', 'Exam hai? Maggi khao, sab aayega!',
 ];
 
 export function createBhaiya(scene) {
