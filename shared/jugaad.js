@@ -226,21 +226,21 @@ export function actionsFor(st, target, ctx = {}) {
   } else if (target.type === 'board') {
     if (!st.power.on) return A;
     const ap = itemWith(st, 'appliance');
-    if (ap) A.push({ id: 'plug', label: `${name(ap)} plug karo (${st.plugged.length + 1}/3)`, hold: 1 });
+    if (ap) A.push({ id: 'plug', label: `${name(ap)} plug karo (${st.plugged.length + 1}/3)`, hold: 1, uses: ap });
   } else if (target.type === 'chowkidar') {
     const ch = st.chowkidar;
     if (ch.awake || !ch.hasKeys) return A;
-    if (it('longhook') && ctx.dist <= 2.4) A.push({ id: 'hookKeys', label: `Chaabi utaaro (${name(it('longhook'))})`, hold: 2.5 });
+    if (it('longhook') && ctx.dist <= 2.4) A.push({ id: 'hookKeys', label: `Chaabi utaaro (${name(it('longhook'))})`, hold: 2.5, uses: it('longhook') });
     if (ctx.dist <= 1.3) A.push({ id: 'grabKeys', label: 'Chupke se chaabi nikalo', hold: 2.5 });
   } else if (target.type === 'door') {
     const d = target.door;
     if (d.kind === 'D') {
       if (d.outsideKey !== undefined && d.locked && ctx.inside) {
-        if (it('key106')) A.push({ id: 'unlock106', label: 'Taala kholo (chaabi)', hold: 0.8 });
-        if (!d.paperUnder && d.outsideKey === 'inLock' && it('flat')) A.push({ id: 'slidePaper', label: `${name(it('flat'))} darwaze ke neeche sarkao`, hold: 1 });
-        if (d.paperUnder && d.outsideKey === 'inLock' && it('thin')) A.push({ id: 'pokeKey', label: `Chaabi andar se dhakelo (${name(it('thin'))})`, hold: 2.2, noise: 1.5 });
+        if (it('key106')) A.push({ id: 'unlock106', label: 'Taala kholo (chaabi)', hold: 0.8, uses: it('key106') });
+        if (!d.paperUnder && d.outsideKey === 'inLock' && it('flat')) A.push({ id: 'slidePaper', label: `${name(it('flat'))} darwaze ke neeche sarkao`, hold: 1, uses: it('flat') });
+        if (d.paperUnder && d.outsideKey === 'inLock' && it('thin')) A.push({ id: 'pokeKey', label: `Chaabi andar se dhakelo (${name(it('thin'))})`, hold: 2.2, noise: 1.5, uses: it('thin') });
         if (d.paperUnder && d.outsideKey === 'onPaper') A.push({ id: 'pullPaper', label: 'Akhbaar kheencho', hold: 1 });
-        if (d.outsideKey === 'inLock' && it('hook')) A.push({ id: 'vent', label: `Ventilator se chaabi ghumao (${name(it('hook'))})`, hold: 3.5, noise: 1.5 });
+        if (d.outsideKey === 'inLock' && it('hook')) A.push({ id: 'vent', label: `Ventilator se chaabi ghumao (${name(it('hook'))})`, hold: 3.5, noise: 1.5, uses: it('hook') });
       } else if (d.locked && d.occupant) {
         A.push({ id: 'knock', label: 'Khatkhatao (koi so raha hai)', hold: 0 });
       } else if (!d.locked) {
@@ -248,14 +248,14 @@ export function actionsFor(st, target, ctx = {}) {
       }
     } else if (d.kind === 'G') {
       if (!d.locked) return A;
-      if (it('pick')) A.push({ id: 'pickGrill', label: `Taala kholo (${name(it('pick'))})`, hold: 4, noise: 3 });
-      if (it('heavy')) A.push({ id: 'smashGrill', label: `Taala tod do (${name(it('heavy'))}) — bahut shor!`, hold: 1.2 });
+      if (it('pick')) A.push({ id: 'pickGrill', label: `Taala kholo (${name(it('pick'))})`, hold: 4, noise: 3, uses: it('pick') });
+      if (it('heavy')) A.push({ id: 'smashGrill', label: `Taala tod do (${name(it('heavy'))}) — bahut shor!`, hold: 1.2, uses: it('heavy') });
     } else if (d.kind === 'M') {
       if (!d.locked) return A;
-      if (it('keyMain')) A.push({ id: 'unlockMain', label: 'Chain ka taala kholo', hold: 2, noise: 4 });
+      if (it('keyMain')) A.push({ id: 'unlockMain', label: 'Chain ka taala kholo', hold: 2, noise: 4, uses: it('keyMain') });
     } else if (d.kind === 'W') {
       if (!d.locked) return A;
-      if (it('heavy')) A.push({ id: 'smashWindow', label: `Dheeli grill tod do (${name(it('heavy'))}) — bahut shor!`, hold: 1.5 });
+      if (it('heavy')) A.push({ id: 'smashWindow', label: `Dheeli grill tod do (${name(it('heavy'))}) — bahut shor!`, hold: 1.5, uses: it('heavy') });
     }
   }
   return A;

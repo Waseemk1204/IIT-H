@@ -24,6 +24,7 @@ export function respawn(p, spawn) {
 // Returns noises made this frame: [{ x, z, r, kind }].
 export function updatePlayer(p, dt, input, map, sensitivity = 0.0022) {
   const m = input.look();
+  p.lastLook = m;
   p.yaw -= m.x * sensitivity;
   p.pitch = Math.max(-1.3, Math.min(1.3, p.pitch - m.y * sensitivity));
 

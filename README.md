@@ -91,7 +91,11 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | `shared/warden-ai.js` | Warden Saab's patrol, sight, hearing and chase (pure logic; tested in Node) |
 | `shared/jugaad.js` | Items, recipes, loot, every way through each lock, distractions, chowkidar, score (pure logic; tested) |
 | `src/interact.js` | What you are looking at, and where a thrown thing lands |
-| `src/render/chowkidar.js`, `src/render/items.js` | The chowkidar; items drawn as comic stickers |
+| `src/render/chowkidar.js` | The sleeping chowkidar |
+| `src/render/props.js` | A 3D model of every item, and how each one sits in your hand |
+| `src/render/viewmodel.js` | First-person hands, drawn on top of the world, with an animation for every way of using things |
+| `src/render/items.js` | Dropped and thrown items lying in the world |
+| `src/render/bhaiya.js` | Bhaiya of Bhaiya Maggi Point, stirring his pot and calling out |
 | `src/render/students.js` | Act 2's students cramming in study circles |
 | `src/cutscenes.js` | Comic-page cutscenes built from engine-rendered panels |
 | `src/input.js` | Keyboard, mouse, and the phone joystick, look-drag and buttons |
@@ -113,3 +117,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 2 code: jugaad rules (items, recipes, locks, distractions, chowkidar, score), inventory and interaction, chowkidar model, item stickers, window and radio, score card, tests. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 3 code: Act 2 power-flip (lights, fans, students, warden sight with lights on), study-circle hiding, extension-board fuse trip and the warden's repair errand, opening and ending comic cutscenes rendered in-engine, power/crowd/fuse sounds and dhol tension music, tests. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 4 code: touch controls and phone layout, objective line, deadline and time bonus, best score, pause settings, icon and manifest. |
+| 3 Oct 2026 | Claude Code (Anthropic) | 3D item models, first-person hands with use animations (rummage, pick, swing, throw, combine, twist...), Bhaiya the Maggi wala NPC with steam and call-outs. |

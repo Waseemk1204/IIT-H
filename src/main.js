@@ -13,7 +13,9 @@ import { playComic } from './cutscenes.js';
 import { buildWorld } from './render/world.js';
 import { createWardenModel } from './render/warden.js';
 import { createChowkidarModel } from './render/chowkidar.js';
-import { createWorldItems, itemSprite } from './render/items.js';
+import { createWorldItems } from './render/items.js';
+import { createViewmodel, ACTION_ANIM } from './render/viewmodel.js';
+import { createBhaiya } from './render/bhaiya.js';
 import { inkBox } from './render/toon.js';
 import { createInput, isTouch } from './input.js';
 import { createPlayer, updatePlayer, respawn, forward, RADIUS } from './player.js';
@@ -40,6 +42,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.autoClear = false;          // two passes: the world, then your hands on top
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x04050b);
@@ -97,35 +100,17 @@ const input = createInput(canvas);
 const hud = createHud();
 hud.onSlot = (i) => { if (i < jug.inv.length) jug.sel = i; };
 
-// Your phone, in your hand, with its torch.
-const phone = new THREE.Group();
-const hand = inkBox(0.07, 0.09, 0.1, 0xc68b59, 0, -0.05, 0.02, 0.006);
-const handset = inkBox(0.075, 0.15, 0.012, 0x1a1a22, 0, 0, 0, 0.006);
-const led = new THREE.Mesh(new THREE.CircleGeometry(0.008, 10), new THREE.MeshBasicMaterial({ color: 0x555555 }));
-led.position.set(0.02, 0.06, -0.008);
-led.rotation.y = Math.PI;
-phone.add(hand, handset, led);
-phone.position.set(0.15, -0.2, -0.42);
-phone.rotation.set(-0.35, -0.2, 0);
-phone.scale.setScalar(0.75);
-camera.add(phone);
+// Your hands (drawn in their own pass) and the phone torch in the left one.
+const vm = createViewmodel();
 const torch = new THREE.SpotLight(0xf3f6ff, 0, 12, 0.55, 0.7, 1.6);
-torch.position.set(0.16, -0.1, -0.5);
+torch.position.set(-0.18, -0.12, -0.5);
 const torchTarget = new THREE.Object3D();
 torchTarget.position.set(0, -0.6, -6);
 camera.add(torch, torchTarget);
 torch.target = torchTarget;
-// Whatever else you are holding, in the other hand.
-let heldSprite = null, heldId = null;
-function showHeld(id) {
-  if (id === heldId) return;
-  heldId = id;
-  if (heldSprite) { camera.remove(heldSprite); heldSprite = null; }
-  if (!id || id === 'phone') return;
-  heldSprite = itemSprite(id, 0.075);
-  heldSprite.position.set(-0.17, -0.15, -0.4);
-  camera.add(heldSprite);
-}
+// Bhaiya, at his stall.
+const bhaiya = createBhaiya(scene);
+const bhaiyaHead = () => bhaiya.headWorld();
 
 let state = 'title';
 let minutes = START_MINUTES;
@@ -146,6 +131,7 @@ function resize() {
   sizeW = w; sizeH = h;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
+  vm.resize(w / h);
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
@@ -358,7 +344,9 @@ function throwSelected() {
   const it = ITEMS[id];
   const w = dropItem(jug, id, land.x, land.z);
   jug.worldItems = jug.worldItems.filter((x) => x !== w);     // in the air for now
-  worldItems.throwFlight(id, v3(player.x, player.eye - 0.2, player.z), land, () => {
+  vm.play('throw', 0.45, { item: id });
+  const f = forward(player);
+  worldItems.throwFlight(id, v3(player.x + f.x * 0.4, player.eye - 0.1, player.z + f.z * 0.4), land, () => {
     jug.worldItems.push(w);
     pendingNoises.push({ x: land.x, z: land.z, r: it.throwNoise });
     hud.sfx(it.sfx, v3(land.x, 0.8, land.z), 1.1);
@@ -375,6 +363,7 @@ function inventoryKeys() {
     const r = recipeFor(jug);
     if (r && r.ready) {
       combine(jug);
+      vm.play('combine', 1.0, { a: r.a, b: r.b, made: r.makes });
       hud.subtitle(r.line, 3);
       hud.bigPop('JUGAAD!');
       sfx.sting('got');
@@ -391,6 +380,7 @@ function inventoryKeys() {
       player.torch = false;
       hud.subtitle('Phone pe 8 second ka alarm laga ke rakh diya. Bhaago!', 3);
     } else {
+      vm.play('drop', 0.3, { item: id });
       dropItem(jug, id, x, z);
     }
   }
@@ -409,10 +399,11 @@ function interact(dt, noises) {
   const action = actions[0] || null;
   if (!input.held('KeyE')) holdLatch = false;
 
-  if (!target) { hud.setPrompt(null); hold = null; return; }
+  if (!target) { hud.setPrompt(null); hold = null; vm.hold(null); return; }
   if (!action) {
     hud.setPrompt(target.type === 'door' && !target.door.locked ? null : (lockedHint(jug, target) || null), true);
     hold = null;
+    vm.hold(null);
     return;
   }
   const others = actions.slice(1).map((a) => a.label);
@@ -422,9 +413,11 @@ function interact(dt, noises) {
   if (input.held('KeyE') && !holdLatch) {
     if (!action.hold) {
       holdLatch = true;
+      if (ACTION_ANIM[action.id]) vm.play(ACTION_ANIM[action.id], action.id === 'knock' ? 0.55 : 0.4, action.uses ? { item: action.uses } : {});
       handle(perform(jug, target, action, { crouch: player.crouch }), noises);
       return;
     }
+    if (ACTION_ANIM[action.id]) vm.hold(ACTION_ANIM[action.id], action.uses);
     if (!hold || hold.key !== key) hold = { key, action, target, t: 0, noiseT: 0 };
     hold.t += dt;
     hold.noiseT += dt;
@@ -437,10 +430,14 @@ function interact(dt, noises) {
     if (hold.t >= action.hold) {
       holdLatch = true;
       hold = null;
+      vm.hold(null);
+      if (/^smash/.test(action.id)) vm.play('smashHit', 0.35, { item: action.uses });
+      else if (action.id === 'pullPaper') vm.play('pull', 0.4);
       handle(perform(jug, target, action, { crouch: player.crouch }), noises);
     }
   } else {
     hold = null;
+    vm.hold(null);
   }
 }
 
@@ -453,23 +450,22 @@ function playerInDoor(door) {
 function shot({ pos, at, power = 0, lamp = 0, fov = 55, setup }) {
   const keep = { power: world.power, target: world.target, flicker: world.flicker, fov: camera.fov, aspect: camera.aspect, lamp: roomLamp.intensity };
   const camPos = camera.position.clone(), camQ = camera.quaternion.clone();
-  const vis = { phone: phone.visible, held: heldSprite?.visible, warden: wardenModel.group.visible };
+  const vis = { warden: wardenModel.group.visible };
   world.power = world.target = power; world.flicker = 0;
   world.update(0);
   applyPower(power);
   roomLamp.intensity = lamp;
-  phone.visible = false; if (heldSprite) heldSprite.visible = false;
   setup?.();
   camera.position.set(...pos); camera.lookAt(...at);
   camera.fov = fov; camera.aspect = 4 / 3; camera.updateProjectionMatrix();
   renderer.setSize(960, 720, false);
+  renderer.clear();
   renderer.render(scene, camera);
   const url = canvas.toDataURL('image/jpeg', 0.86);
   Object.assign(world, { power: keep.power, target: keep.target, flicker: keep.flicker });
   world.update(0);
   applyPower(keep.power);
   roomLamp.intensity = keep.lamp;
-  phone.visible = vis.phone; if (heldSprite) heldSprite.visible = vis.held;
   wardenModel.group.visible = vis.warden;
   camera.position.copy(camPos); camera.quaternion.copy(camQ);
   camera.fov = keep.fov; camera.aspect = keep.aspect; camera.updateProjectionMatrix();
@@ -623,10 +619,12 @@ function tick(dt) {
     camera.lookAt(...window.__debugCam.at);
   }
   torch.intensity = player.torch ? 7 : 0;
-  led.material.color.set(player.torch ? 0xffffff : 0x444444);
-  phone.visible = jug.inv.includes('phone');
-  phone.position.y = -0.2 + (player.moving ? Math.abs(Math.cos(player.bob)) * 0.012 : 0);
-  showHeld(selected(jug));
+  vm.setPhone(jug.inv.includes('phone'), player.torch);
+  vm.setHeld(selected(jug));
+  vm.light(hemi, world.power);
+  vm.update(dt, { moving: player.moving, bob: player.bob, running: player.running, look: player.lastLook });
+  const call = bhaiya.update(dt, player);
+  if (call && state === 'playing') hud.say(call, bhaiyaHead, '', 'Bhaiya');
 
   applyPower(world.power);
   world.setPlugged(jug.plugged.length);
@@ -640,7 +638,9 @@ function tick(dt) {
   hud.setHold(hold ? hold.t / hold.action.hold : 0);
   hud.update(dt, camera, sizeW, sizeH);
 
+  renderer.clear();
   renderer.render(scene, camera);
+  if (state === 'playing' || state === 'paused') vm.render(renderer);
 }
 showOverlay('title');
 requestAnimationFrame(frame);
