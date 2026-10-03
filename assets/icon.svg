@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <title>Maggie ke liye kuch bhi: a bowl of Maggi with a sprung padlock</title>
+  <rect width="128" height="128" rx="24" fill="#14110f"/>
+  <path d="M64 8l10 18 20-8-2 21 21 4-15 15 13 16-21 2 2 21-19-9-9 19-10-18-20 8 2-21-21-4 15-15-13-16 21-2-2-21 19 9z" fill="#f2c230" stroke="#14110f" stroke-width="3"/>
+  <path d="M30 62h68c0 22-15 36-34 36S30 84 30 62z" fill="#f4ead0" stroke="#14110f" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M36 62c6-8 10 4 16-4s10 4 16-4 10 4 16-4 8 4 12 2" fill="none" stroke="#e8b923" stroke-width="7" stroke-linecap="round"/>
+  <path d="M36 62c6-8 10 4 16-4s10 4 16-4 10 4 16-4 8 4 12 2" fill="none" stroke="#14110f" stroke-width="2"/>
+  <path d="M48 44c-4-6 4-8 0-14M64 42c-4-6 4-8 0-14M80 44c-4-6 4-8 0-14" fill="none" stroke="#14110f" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(86 84) rotate(18)">
+    <rect x="-13" y="0" width="26" height="22" rx="4" fill="#e0442c" stroke="#14110f" stroke-width="4"/>
+    <path d="M-8 0v-9a8 8 0 0 1 16 0v-6" fill="none" stroke="#14110f" stroke-width="4"/>
+  </g>
+</svg>

@@ -18,13 +18,20 @@ All game code is written from scratch during the jam. The only third-party code 
 npm start
 ```
 
-Then open http://localhost:5180. There is nothing to install and no build step.
+Then open http://localhost:5180. There is nothing to install and no build step. It is a
+plain static site, so any static host (GitHub Pages, Vercel, Netlify) can serve the repo
+root as it is.
 
 ```bash
 npm test
 ```
 
 runs the tests for the map, collision, line of sight and the warden's AI.
+
+**On a phone:** play in landscape (a card asks you to turn the phone). Left thumb on the
+joystick, drag on the right half to look, and buttons for USE (hold it for longer jobs),
+RUN, CROUCH, TORCH, THROW, JODO (combine) and DROP; tap an inventory slot to pick it.
+Starting the game goes full screen where the browser allows it.
 
 **Controls:** WASD move · mouse look (click to lock; drag also works) · Shift run (loud) ·
 C crouch · F phone torch · E use (hold E for longer jobs) · 1–6 or mouse wheel pick an item ·
@@ -70,7 +77,10 @@ last twist at the Maggi stall. Audio: mains hum and fans when the power is on, a
 crowd, the fuse blowing, and a dhol-and-tabla loop that gets busier when he is suspicious
 and frantic when he is chasing you.
 
-Next: Phase 4 (phone controls, playtesting and balancing, score card polish).
+**Phase 4 (done):** touch controls and a landscape-only phone layout; a KAAM line under the
+clock that always says what to do next; the 3 AM deadline (the stall closes; 15 real
+minutes, with a warning at 2:45); a time bonus and a saved best score on the score card;
+a pause menu with sensitivity, controls and restart; an icon and web manifest.
 
 ## How it is built
 
@@ -83,6 +93,7 @@ Next: Phase 4 (phone controls, playtesting and balancing, score card polish).
 | `src/render/chowkidar.js`, `src/render/items.js` | The chowkidar; items drawn as comic stickers |
 | `src/render/students.js` | Act 2's students cramming in study circles |
 | `src/cutscenes.js` | Comic-page cutscenes built from engine-rendered panels |
+| `src/input.js` | Keyboard, mouse, and the phone joystick, look-drag and buttons |
 | `src/main.js` | Renderer, the game loop, and the glue between player, warden and HUD |
 | `src/player.js` | First-person movement, crouch, run, footstep noise |
 | `src/render/world.js` | Builds the hostel in 3D from the grid |
@@ -100,3 +111,4 @@ Next: Phase 4 (phone controls, playtesting and balancing, score card polish).
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 1 code: map and collision, line of sight and path finding, warden AI, 3D hostel and warden models, toon rendering, HUD, synthesised audio, tests. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 2 code: jugaad rules (items, recipes, locks, distractions, chowkidar, score), inventory and interaction, chowkidar model, item stickers, window and radio, score card, tests. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 3 code: Act 2 power-flip (lights, fans, students, warden sight with lights on), study-circle hiding, extension-board fuse trip and the warden's repair errand, opening and ending comic cutscenes rendered in-engine, power/crowd/fuse sounds and dhol tension music, tests. |
+| 3 Oct 2026 | Claude Code (Anthropic) | Phase 4 code: touch controls and phone layout, objective line, deadline and time bonus, best score, pause settings, icon and manifest. |

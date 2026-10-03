@@ -15,14 +15,15 @@ import { createWardenModel } from './render/warden.js';
 import { createChowkidarModel } from './render/chowkidar.js';
 import { createWorldItems, itemSprite } from './render/items.js';
 import { inkBox } from './render/toon.js';
-import { createInput } from './input.js';
+import { createInput, isTouch } from './input.js';
 import { createPlayer, updatePlayer, respawn, forward, RADIUS } from './player.js';
 import { findTarget, landingPoint } from './interact.js';
 import { createHud, showOverlay } from './hud.js';
 import * as sfx from './audio.js';
 
 const START_MINUTES = 90;            // 1:30 AM
-const MINUTES_PER_SECOND = 1 / 3;    // game clock speed
+const MINUTES_PER_SECOND = 1 / 10;   // game clock: 1:30 to 3:00 AM is 15 real minutes
+const CLOSING = 180;                 // 3:00 AM: Bhaiya pulls the shutter down
 const CAUGHT_LINES = [
   'Raat ke do baje Maggi?! Chal kamre mein!',
   'Exam kal hai aur janab ghoom rahe hain!',
@@ -35,7 +36,7 @@ await document.fonts?.load('48px "Bangers"').catch(() => {});
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -94,6 +95,7 @@ for (const x of [36.15, 35.5]) {
 const player = createPlayer(map.spawn);
 const input = createInput(canvas);
 const hud = createHud();
+hud.onSlot = (i) => { if (i < jug.inv.length) jug.sel = i; };
 
 // Your phone, in your hand, with its torch.
 const phone = new THREE.Group();
@@ -135,6 +137,7 @@ let hold = null;              // { key, action, target, t, noiseT }
 let holdLatch = false;        // E must be released before the next action
 let prevX = player.x;
 let wasSeated = false;
+let warned15 = false;
 
 let sizeW = 0, sizeH = 0;
 function resize() {
@@ -155,9 +158,26 @@ function startPlaying() {
   state = 'playing';
   showOverlay(null);
 }
+// Settings that stick between visits (if the browser lets us store them).
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(`mkkb-${k}`); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(`mkkb-${k}`, JSON.stringify(v)); } catch { /* private mode */ } },
+};
+let sensitivity = store.get('sens', 1);
+const sens = document.getElementById('sens');
+sens.value = sensitivity;
+sens.addEventListener('input', () => { sensitivity = Number(sens.value); store.set('sens', sensitivity); });
+document.getElementById('restart').addEventListener('click', () => location.reload());
+document.getElementById('late-again').addEventListener('click', () => location.reload());
+
+const portrait = matchMedia('(orientation: portrait)');
 let introDone = false;
 document.getElementById('start').addEventListener('click', async () => {
   sfx.startAudio();
+  if (isTouch) {
+    try { await document.documentElement.requestFullscreen?.(); } catch { /* not allowed */ }
+    try { await screen.orientation?.lock?.('landscape'); } catch { /* iPhone can't */ }
+  }
   if (!introDone && !window.__skipComics) await playComic(openingPanels(), { title: 'Raat 1:29 baje...' });
   introDone = true;
   startPlaying();
@@ -170,7 +190,6 @@ document.addEventListener('pointerlockchange', () => {
 let muted = false;
 let caughtReady = false;
 addEventListener('keydown', (e) => {
-  if (e.code === 'KeyP' && state === 'playing') { state = 'paused'; document.exitPointerLock?.(); showOverlay('pause'); }
   if (state === 'caught' && caughtReady) backToRoom();
   if (e.code === 'KeyM') { muted = !muted; sfx.setMuted(muted); }
 });
@@ -180,6 +199,34 @@ addEventListener('wheel', (e) => {
   if (state !== 'playing' || !jug.inv.length) return;
   jug.sel = (jug.sel + (e.deltaY > 0 ? 1 : -1) + jug.inv.length) % jug.inv.length;
 }, { passive: true });
+
+function pause() {
+  state = 'paused';
+  hold = null;
+  document.exitPointerLock?.();
+  document.getElementById('pause-objective').textContent = objective();
+  showOverlay('pause');
+}
+
+function tooLate() {
+  state = 'late';
+  hold = null;
+  document.exitPointerLock?.();
+  sfx.setTension(0);
+  sfx.sting('caught');
+  showOverlay('late');
+}
+
+// What should you be doing right now? Shown under the clock.
+function objective() {
+  if (map.doors.get(MY_DOOR).locked) return 'Kamre se niklo. Chaabi bahar taale mein hai. Almirah, bistar, table: talaashi lo!';
+  if (!jug.solved.grill) return 'A-wing ka grill gate paar karo. Lock pick (bobby pin + compass), cricket bat, ya Warden Saab ke peeche-peeche.';
+  if (!jug.solved.main) {
+    if (jug.power.on) return 'Bijli wapas! Study circle mein chhupo, ya kettle + press + heater se fuse udaao. Phir: chowkidar ki chaabi.';
+    return 'Main gate ki chaabi soye chowkidar ki belt pe hai. Ya lobby ki dheeli khidki...';
+  }
+  return 'Gate khul gaya! Bhaiya ki Maggi Point tak bhaago!';
+}
 
 function getCaught() {
   state = 'caught';
@@ -219,7 +266,14 @@ async function win() {
   sfx.setTension(0);
   if (!window.__skipComics) await playComic(endingPanels(), { title: 'Maggi Point, raat 2 baje ke baad...' });
   state = 'won';
+  const left = Math.max(0, Math.floor(CLOSING - minutes));
+  if (left > 0) jug.log.push({ text: `Band hone se ${left} minute pehle pahunche`, kind: 'time', points: left * 4 });
   const s = score(jug, caughtCount);
+  const best = store.get('best', 0);
+  if (s.total > best) store.set('best', s.total);
+  document.getElementById('score-best').textContent = s.total > best
+    ? (best ? `NAYA RECORD! Pichhla best: ${best}` : 'Pehla record ban gaya!')
+    : `Tumhara best: ${best}`;
   const list = document.getElementById('score-lines');
   list.innerHTML = '';
   for (const l of s.lines) {
@@ -482,7 +536,8 @@ function tick(dt) {
       jug.seated = null;
       player.crouch = false;
     }
-    const noises = updatePlayer(player, dt, input, map);
+    if (input.tapped('KeyP', 'Escape') || (isTouch && portrait.matches)) { pause(); input.endFrame(); return; }
+    const noises = updatePlayer(player, dt, input, map, 0.0022 * sensitivity);
     if (jug.seated) {
       if (!wasSeated) { player.yaw = jug.seated.yaw; player.pitch = -0.3; }
       player.x = jug.seated.seat.x; player.z = jug.seated.seat.z;
@@ -548,6 +603,9 @@ function tick(dt) {
 
     if (Math.hypot(player.x - CANTEEN.x, player.z - CANTEEN.z) < CANTEEN.r) win();
     minutes += dt * MINUTES_PER_SECOND;
+    if (minutes >= CLOSING - 15 && !warned15) { warned15 = true; hud.toast('⏰ 15 minute bache! Maggi Point 3 baje band.'); }
+    if (minutes >= CLOSING && state === 'playing') tooLate();
+    hud.setObjective(objective(), minutes >= CLOSING - 15);
     input.endFrame();
   } else {
     hud.setPrompt(null);
@@ -591,4 +649,5 @@ requestAnimationFrame(frame);
 window.__game = {
   map, jug, player, warden, scene, camera, renderer,
   // Advance the game by `seconds` without waiting for frames (for testing).
-  step(seconds) { for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60); }, get state() { return state; }, set state(s) { state = s; } };
+  step(seconds) { for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60); },
+  get minutes() { return minutes; }, set minutes(m) { minutes = m; }, get state() { return state; }, set state(s) { state = s; } };

@@ -11,7 +11,8 @@ export function createHud() {
   const torchEl = $('torch-state'), stanceEl = $('stance');
   const layer = $('bubbles'), subtitle = $('subtitle');
   const inv = $('inventory'), invInfo = $('inv-info'), holdEl = $('hold'), toasts = $('toasts'), pop = $('bigpop');
-  let lastPrompt = '', lastInv = '';
+  let lastPrompt = '', lastInv = '', lastObjective = '';
+  const objective = $('objective');
   const bubbles = [];
   const v = new THREE.Vector3();
   let subT = 0;
@@ -51,6 +52,7 @@ export function createHud() {
       const key = `${text}|${isHint}|${sub}`;
       if (key === lastPrompt) return;
       lastPrompt = key;
+      if (text && document.body.classList.contains('touch')) text = text.replace(/^\[E( hold)?\]/, (m, h) => `[USE${h || ''}]`);
       prompt.textContent = text || '';
       if (sub) { const s = document.createElement('small'); s.textContent = sub; prompt.appendChild(s); }
       prompt.classList.toggle('show', !!text);
@@ -67,6 +69,13 @@ export function createHud() {
       pop.textContent = text;
       pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go');
     },
+    setObjective(text, late) {
+      if (text === lastObjective) return;
+      lastObjective = text;
+      objective.innerHTML = '<b>KAAM:</b><span></span>';
+      objective.lastChild.textContent = text;
+      objective.classList.toggle('late', !!late);
+    },
     setHold(p) {
       holdEl.style.setProperty('--p', `${Math.round(p * 360)}deg`);
       holdEl.classList.toggle('show', p > 0);
@@ -81,6 +90,7 @@ export function createHud() {
         const slot = document.createElement('div');
         slot.className = `slot${i === st.sel && id ? ' sel' : ''}${id ? '' : ' empty'}`;
         slot.innerHTML = `<i>${i + 1}</i><span></span>`;
+        slot.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onSlot?.(i); });
         if (id) slot.lastChild.textContent = ITEMS[id].icon;
         inv.appendChild(slot);
       }

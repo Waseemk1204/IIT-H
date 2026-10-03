@@ -35,6 +35,10 @@ export function updatePlayer(p, dt, input, map, sensitivity = 0.0022) {
   if (input.held('KeyS', 'ArrowDown')) fz += 1;
   if (input.held('KeyA', 'ArrowLeft')) fx -= 1;
   if (input.held('KeyD', 'ArrowRight')) fx += 1;
+  // The touch joystick, if it is being pushed.
+  const ax = input.axis?.() || { x: 0, y: 0 };
+  let analog = 1;
+  if (Math.hypot(ax.x, ax.y) > 0.15) { fx = ax.x; fz = ax.y; analog = Math.min(1, Math.hypot(ax.x, ax.y)); }
   const len = Math.hypot(fx, fz);
   p.running = input.held('ShiftLeft', 'ShiftRight') && len > 0 && fz < 0;
   if (p.running) p.crouch = false;
@@ -47,7 +51,7 @@ export function updatePlayer(p, dt, input, map, sensitivity = 0.0022) {
     const s = Math.sin(p.yaw), c = Math.cos(p.yaw);
     const wx = fx * c + fz * s;
     const wz = -fx * s + fz * c;
-    const sp = SPEED[gait] * dt;
+    const sp = SPEED[gait] * dt * (gait === 'run' ? 1 : Math.max(0.4, analog));
     const before = { x: p.x, z: p.z };
     const n = moveCircle(map, p.x, p.z, wx * sp, wz * sp, RADIUS);
     p.x = n.x; p.z = n.z;

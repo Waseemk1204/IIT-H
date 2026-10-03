@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#14110f">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     { "imports": { "three": "./assets/vendor/three.module.js" } }
@@ -20,6 +23,7 @@
   <!-- HUD -->
   <div id="hud">
     <div id="status-left" class="chip"><span id="clock">1:30 AM</span><span id="area">Room 106</span></div>
+    <div id="objective"></div>
     <div id="status-right"><span id="stance" class="chip">WALKING</span><span id="torch-state" class="chip">TORCH OFF</span></div>
     <div id="meter"><span id="meter-label">Kuch dikha?</span><div id="meter-bar"><div id="meter-fill"></div></div></div>
     <div id="crosshair"></div>
@@ -32,6 +36,23 @@
     <div id="bubbles"></div>
   </div>
 
+  <!-- Touch controls (phones) -->
+  <div id="touch">
+    <div id="look-zone"></div>
+    <div id="stick"><div id="knob"></div></div>
+    <div id="tbtns">
+      <button data-key="KeyE" class="tb use">USE</button>
+      <button data-key="ShiftLeft" class="tb">RUN</button>
+      <button data-key="KeyC" class="tb">CROUCH</button>
+      <button data-key="KeyF" class="tb">TORCH</button>
+      <button data-key="KeyV" class="tb">THROW</button>
+      <button data-key="KeyG" class="tb">JODO</button>
+      <button data-key="KeyQ" class="tb">DROP</button>
+    </div>
+    <button data-key="KeyP" class="tb" id="tpause" aria-label="Pause">II</button>
+  </div>
+  <div id="rotate"><div>📱↻</div><p>Phone ko landscape mein ghumao</p></div>
+
   <!-- Title -->
   <section id="title" class="overlay">
     <div class="panel cover">
@@ -41,6 +62,7 @@
         growling, and the whole block just went dark. Bhaiya's Maggi Point is open till 3.
         Warden Saab is awake, and he has a torch.</p>
       <button id="start" class="btn">CHUPKE SE NIKLO →</button>
+      <p class="touch-only fine">Phone pe: left thumb se chalo, right side drag karke dekho. Landscape + fullscreen best hai.</p>
       <div class="controls">
         <span><b>WASD</b> move</span><span><b>Mouse</b> look</span><span><b>Shift</b> run (loud!)</span>
         <span><b>C</b> crouch</span><span><b>F</b> phone torch</span><span><b>E</b> use / hold E</span>
@@ -49,7 +71,7 @@
       </div>
       <p class="tips">Darkness hides you. His torch beam doesn't. Neither does yours.<br>
         Pehle toh... roommate ne tumhe bahar se lock kar diya hai.</p>
-      <p class="fine">Phase 3 build · IIT-H Game Jam · AI-assisted, see README</p>
+      <p class="fine">IIT-H Game Jam · Comic · Twist · Light · AI-assisted, see README</p>
     </div>
   </section>
 
@@ -57,8 +79,17 @@
   <section id="pause" class="overlay">
     <div class="panel small">
       <h2>RUKO ZARA...</h2>
-      <p>Game paused.</p>
+      <p id="pause-objective"></p>
       <button id="resume" class="btn">WAPAS CHALO</button>
+      <label class="setting">Mouse / touch sensitivity
+        <input id="sens" type="range" min="0.4" max="2.2" step="0.1" value="1">
+      </label>
+      <div class="controls small-controls">
+        <span><b>WASD</b> move</span><span><b>Shift</b> run</span><span><b>C</b> crouch</span>
+        <span><b>F</b> torch</span><span><b>E</b> use</span><span><b>1–6</b> item</span>
+        <span><b>G</b> combine</span><span><b>Q</b> drop</span><span><b>V</b> throw</span><span><b>M</b> mute</span>
+      </div>
+      <button id="restart" class="btn ghost">SHURU SE KHELO</button>
     </div>
   </section>
 
@@ -85,6 +116,16 @@
     </div>
   </section>
 
+  <!-- Too late -->
+  <section id="late" class="overlay">
+    <div class="panel caught-panel">
+      <div class="boom">MAGGI POINT BAND!</div>
+      <p class="speech">"3 baj gaye, beta. Shutter down. Kal aana."</p>
+      <p>Bhaiya ne shutter gira diya. Pet mein chuhe, haath mein kuch nahi.</p>
+      <button id="late-again" class="btn">PHIR SE KOSHISH</button>
+    </div>
+  </section>
+
   <!-- Won -->
   <section id="won" class="overlay">
     <div class="panel won-panel">
@@ -93,6 +134,7 @@
       <ul id="score-lines"></ul>
       <p class="total">JUGAAD SCORE: <b id="score-total">0</b></p>
       <p class="title-card">Tum ho: <b id="score-title"></b></p>
+      <p id="score-best" class="fine"></p>
       
       <button id="again" class="btn">PHIR SE KHELO</button>
     </div>
