@@ -38,7 +38,8 @@ function beamMaterial() {
   });
 }
 
-export function createWardenModel() {
+// torchLight: false for the ending's stand-in (no light, no shadow pass).
+export function createWardenModel({ shadowSize = 1024, torchLight = true } = {}) {
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);
@@ -117,13 +118,13 @@ export function createWardenModel() {
   const spot = new THREE.SpotLight(0xffefc4, 90, BEAM_RANGE + 3, BEAM_HALF_ANGLE, 0.35, 1.2);
   spot.position.set(0.32, 0.02, 0.7);
   spot.castShadow = true;
-  spot.shadow.mapSize.set(1024, 1024);
+  spot.shadow.mapSize.set(shadowSize, shadowSize);
   spot.shadow.camera.near = 0.3;
   spot.shadow.bias = -0.002;
   const target = new THREE.Object3D();
   target.position.set(0.32, 0.02 + Math.sin(pitch) * 8, 0.7 + 8);
   spot.target = target;
-  torchPivot.add(spot, target);
+  if (torchLight) torchPivot.add(spot, target);
 
   const L = 9;
   const coneGeo = new THREE.ConeGeometry(Math.tan(BEAM_HALF_ANGLE) * L, L, 28, 1, true);
@@ -133,7 +134,7 @@ export function createWardenModel() {
   beam.position.copy(spot.position);
   beam.rotation.x = -pitch;
   beam.renderOrder = 10;
-  torchPivot.add(beam);
+  if (torchLight) torchPivot.add(beam);
 
   group.traverse((o) => { if (o.isMesh && !o.userData.isHull && o !== beam && o !== lens) o.castShadow = true; });
   beam.castShadow = false;

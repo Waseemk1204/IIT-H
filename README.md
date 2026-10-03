@@ -29,7 +29,14 @@ npm test
 
 runs the tests for the map, collision, line of sight and the warden's AI.
 
-**On a phone:** play in landscape (a card asks you to turn the phone). Left thumb on the
+**On a phone:** landscape only. Held upright, the page shows nothing but a "turn your phone"
+card (pure CSS, so it works before the game loads) and the game pauses and stops drawing.
+Phones get a lighter build: static furniture and walls are baked into a few big meshes
+(hundreds of draw calls down to about 150), half the lights, smaller shadows, no
+antialiasing, and a resolution that drops by itself if frames get slow. The buttons only
+show when they do something (THROW with a throwable, JODO when two things combine), USE
+glows when there is something to use and fills up while you hold it, and big moments buzz
+(Android). Left thumb on the
 joystick, drag on the right half to look, and buttons for USE (hold it for longer jobs),
 RUN, CROUCH, TORCH, THROW, JODO (combine) and DROP; tap an inventory slot to pick it.
 Starting the game goes full screen where the browser allows it.
@@ -96,6 +103,7 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | `src/render/viewmodel.js` | First-person hands, drawn on top of the world, with an animation for every way of using things |
 | `src/render/items.js` | Dropped and thrown items lying in the world |
 | `src/render/bhaiya.js` | Bhaiya of Bhaiya Maggi Point, stirring his pot and calling out |
+| `src/render/merge.js` | Bakes everything that never moves into one mesh per material (fewer draw calls) |
 | `src/render/students.js` | Act 2's students cramming in study circles |
 | `src/cutscenes.js` | Comic-page cutscenes built from engine-rendered panels |
 | `src/input.js` | Keyboard, mouse, and the phone joystick, look-drag and buttons |
@@ -118,3 +126,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 3 code: Act 2 power-flip (lights, fans, students, warden sight with lights on), study-circle hiding, extension-board fuse trip and the warden's repair errand, opening and ending comic cutscenes rendered in-engine, power/crowd/fuse sounds and dhol tension music, tests. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 4 code: touch controls and phone layout, objective line, deadline and time bonus, best score, pause settings, icon and manifest. |
 | 3 Oct 2026 | Claude Code (Anthropic) | 3D item models, first-person hands with use animations (rummage, pick, swing, throw, combine, twist...), Bhaiya the Maggi wala NPC with steam and call-outs. |
+| 3 Oct 2026 | Claude Code (Anthropic) | Comic pages that fit the screen, full screen buttons, phone optimisation (static mesh merging, lite lighting, adaptive resolution, contextual touch buttons, haptics), portrait blocked. |

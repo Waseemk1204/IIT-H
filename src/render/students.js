@@ -1,6 +1,7 @@
 // Act 2: students sitting in study circles on the floor, cramming.
 import * as THREE from 'three';
 import { inkBox, inkMesh } from './toon.js';
+import { mergeStatic } from './merge.js';
 
 const SHIRTS = [0xd35454, 0x3f7fbf, 0x4fa36b, 0xe0a23a, 0x8a5cc2, 0x2f2f38, 0xe3e0d6, 0x36a3a0];
 const SKINS = [0xc68b59, 0x9c6a43, 0xb47a4c, 0x8a5a36, 0xd19a6a];
@@ -17,6 +18,7 @@ function student(i) {
   const torso = inkBox(0.36, 0.46, 0.22, shirt, 0, 0.12, -0.05);
   g.add(torso);
   const head = new THREE.Group();
+  head.userData.dynamic = true;      // nods over the book
   head.position.set(0, 0.74, -0.03);
   head.add(inkMesh(new THREE.SphereGeometry(0.13, 12, 9), skin));
   const hair = inkMesh(new THREE.SphereGeometry(0.135, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0x1b1512, 0.008);
@@ -62,6 +64,7 @@ export function createStudents(scene, circles) {
     notes.rotation.y = 0.3;
     group.add(notes);
   }
+  mergeStatic(group);
   let t = 0, mumbleT = 3;
   return {
     group,

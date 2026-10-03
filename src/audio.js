@@ -239,3 +239,6 @@ function music() {
     }
   }, 50);
 }
+
+export function suspend() { ctx?.suspend(); }
+export function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }

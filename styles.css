@@ -315,3 +315,49 @@ body.touch #title .controls { display: none; }
 .fs-btn[hidden] { display: none !important; }
 #title .fs-label { display: block; margin: 12px auto 0; font-size: 18px; padding: 6px 18px; }
 #pause .fs-label { font-size: 18px; }
+
+/* ---------- phones: no portrait, no zoom, no stray selection ---------- */
+html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+#game, #touch, #hud { touch-action: none; }
+.panel, .comic-page { touch-action: pan-y; }
+/* Portrait on a phone or tablet: nothing but the "turn it" card, even before the script runs. */
+#rotate { z-index: 100; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate {
+    display: grid; place-items: center; align-content: center; position: fixed; inset: 0;
+    background: #14110f; color: var(--paper); text-align: center; font-family: var(--comic); font-size: 24px; letter-spacing: 1px;
+  }
+  #rotate div { font-size: 64px; animation: turn 1.6s ease-in-out infinite; }
+  body > :not(#rotate) { visibility: hidden; }
+}
+@keyframes turn { 0%, 30% { rotate: 0deg; } 60%, 100% { rotate: -90deg; } }
+
+/* Contextual buttons and the glowing USE */
+.tb[hidden] { display: none; }
+.tb.use { position: relative; background: rgba(244, 234, 208, .88); }
+.tb.use.ready { background: var(--yellow); animation: ready 1s ease-in-out infinite; }
+.tb.use::after {
+  content: ''; position: absolute; left: 0; bottom: 0; height: 5px; width: var(--p, 0%);
+  background: var(--red); border-radius: 0 0 6px 6px;
+}
+@keyframes ready { 50% { box-shadow: 3px 3px 0 var(--ink), 0 0 0 4px rgba(242, 194, 48, .45); } }
+
+/* Notches and rounded corners */
+#status-left, #objective { left: calc(16px + env(safe-area-inset-left)); }
+#status-right { right: calc(16px + env(safe-area-inset-right)); }
+#toasts { right: calc(16px + env(safe-area-inset-right)); }
+body.touch #inv-wrap { bottom: calc(10px + env(safe-area-inset-bottom)); }
+body.touch #stick { bottom: calc(24px + env(safe-area-inset-bottom)); }
+body.touch #tbtns { bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+/* Small landscape screens: tighter HUD */
+body.touch #objective { font-size: 12px; max-width: 290px; top: 44px; padding: 3px 8px; }
+body.touch #status-left { top: 8px; }
+body.touch .bubble.speech { font-size: 17px; padding: 3px 10px; }
+body.touch #bigpop { font-size: 56px; }
+body.touch .toast { font-size: 15px; }
+body.touch #toasts { top: 64px; }
+/* keep prompts clear of the button cluster on phones */
+body.touch #prompt { left: 42%; max-width: 46vw; font-size: 15px; text-align: center; }
+body.touch #prompt.hint { font-size: 12px; max-width: 46vw; padding: 4px 10px; }
+body.touch #prompt small { font-size: 11px; }

@@ -37,8 +37,11 @@ const CAUGHT_LINES = [
 await document.fonts?.load('48px "Bangers"').catch(() => {});
 
 const canvas = document.getElementById('game');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isTouch, powerPreference: 'high-performance' });
+// Resolution: phones start lower, and it adapts to keep the frame rate up.
+const MAX_PR = Math.min(devicePixelRatio, isTouch ? 1.5 : 2);
+let pixelRatio = isTouch ? Math.min(MAX_PR, 1.25) : MAX_PR;
+renderer.setPixelRatio(pixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -66,22 +69,23 @@ function applyPower(p) {
 // Only used for the opening comic: your room with its light on.
 const roomLamp = new THREE.PointLight(0xfff1d6, 0, 7, 1.3);
 roomLamp.position.set(2.5, 2.6, 10.5);
+roomLamp.visible = false;            // switched on only while drawing those panels
 scene.add(roomLamp);
 
 const map = createMap();
 const jug = createJugaad(map);
-const world = buildWorld(map);
+const world = buildWorld(map, { lite: isTouch });
 scene.add(world.root);
 
 const warden = createWarden(map, WARDEN_START, WARDEN_ROUTE);
-const wardenModel = createWardenModel();
+const wardenModel = createWardenModel({ shadowSize: isTouch ? 512 : 1024 });
 scene.add(wardenModel.group);
 const chowModel = createChowkidarModel();
 scene.add(chowModel.group);
 const worldItems = createWorldItems(scene);
 const students = createStudents(scene, STUDY_CIRCLES);
 // A second Warden Saab, for the ending: standing at the Maggi stall.
-const cutWarden = createWardenModel();
+const cutWarden = createWardenModel({ torchLight: false });
 cutWarden.group.visible = false;
 cutWarden.setTorch(false);
 scene.add(cutWarden.group);
@@ -123,6 +127,7 @@ let holdLatch = false;        // E must be released before the next action
 let prevX = player.x;
 let wasSeated = false;
 let warned15 = false;
+let canUseNow = false;
 
 let sizeW = 0, sizeH = 0;
 function resize() {
@@ -242,6 +247,7 @@ function getCaught() {
   caughtReady = false;
   hold = null;
   sfx.sting('caught');
+  buzz([120, 60, 220]);
   jug.seated = null;
   sfx.setTension(0);
   const taken = confiscateHeld(jug);
@@ -321,6 +327,7 @@ function handle(events, noises) {
     } else if (e.type === 'msg') hud.subtitle(e.text, 3);
     else if (e.type === 'got') {
       for (const id of e.items) hud.toast(`${ITEMS[id].icon} ${ITEMS[id].name} mil gaya!`);
+      buzz(20);
       sfx.sting('got');
     } else if (e.type === 'say') {
       if (e.who === 'warden') { hud.say(e.line, wardenHead, 'alert'); wardenModel.setMood('angry'); }
@@ -350,6 +357,7 @@ function powerChanged(e) {
     }
   } else {
     sfx.fuseBlow();
+    buzz([100, 50, 160]);
     sfx.groan();
     hud.bigPop('PHATAAK!');
     hud.subtitle('Fuse ud gaya! Andhera wapas. Warden Saab MCB theek karne gaye...', 4);
@@ -386,6 +394,7 @@ function inventoryKeys() {
     if (r && r.ready) {
       combine(jug);
       vm.play('combine', 1.0, { a: r.a, b: r.b, made: r.makes });
+      buzz([30, 40, 30]);
       hud.subtitle(r.line, 3);
       hud.bigPop('JUGAAD!');
       sfx.sting('got');
@@ -419,9 +428,10 @@ function interact(dt, noises) {
     actions = [];
   }
   const action = actions[0] || null;
+  canUseNow = !!action;
   if (!input.held('KeyE')) holdLatch = false;
 
-  if (!target) { hud.setPrompt(null); hold = null; vm.hold(null); return; }
+  if (!target) { canUseNow = false; hud.setPrompt(null); hold = null; vm.hold(null); return; }
   if (!action) {
     hud.setPrompt(target.type === 'door' && !target.door.locked ? null : (lockedHint(jug, target) || null), true);
     hold = null;
@@ -453,7 +463,7 @@ function interact(dt, noises) {
       holdLatch = true;
       hold = null;
       vm.hold(null);
-      if (/^smash/.test(action.id)) vm.play('smashHit', 0.35, { item: action.uses });
+      if (/^smash/.test(action.id)) { vm.play('smashHit', 0.35, { item: action.uses }); buzz(90); }
       else if (action.id === 'pullPaper') vm.play('pull', 0.4);
       handle(perform(jug, target, action, { crouch: player.crouch }), noises);
     }
@@ -468,6 +478,32 @@ function playerInDoor(door) {
   return Math.hypot(player.x - px, player.z - pz) < RADIUS + 0.02;
 }
 
+// ---- phone niceties: only the buttons that do something, a glowing USE, buzzes
+const tb = (k) => document.querySelector(`#tbtns [data-key="${k}"]`);
+const TB = isTouch ? { use: tb('KeyE'), torch: tb('KeyF'), throw: tb('KeyV'), combine: tb('KeyG'), drop: tb('KeyQ') } : null;
+let tbKey = '';
+function updateTouchButtons(canUse) {
+  if (!TB) return;
+  const sel = selected(jug);
+  const r = recipeFor(jug);
+  const k = [jug.inv.includes('phone'), sel && ITEMS[sel].props.includes('throw'), r && r.ready, !!sel, canUse].join();
+  if (k !== tbKey) {
+    tbKey = k;
+    TB.torch.hidden = !jug.inv.includes('phone');
+    TB.throw.hidden = !(sel && ITEMS[sel].props.includes('throw'));
+    TB.combine.hidden = !(r && r.ready);
+    TB.drop.hidden = !sel;
+    TB.use.classList.toggle('ready', canUse);
+  }
+  TB.use.style.setProperty('--p', `${Math.round((hold ? hold.t / hold.action.hold : 0) * 100)}%`);
+}
+function buzz(pattern) { if (isTouch) try { navigator.vibrate?.(pattern); } catch { /* no vibration */ } }
+
+// Leaving the app (or locking the phone) pauses the game.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (state === 'playing') pause(); sfx.suspend(); } else sfx.resume();
+});
+
 // ---- comic panels, rendered by the engine
 function shot({ pos, at, power = 0, lamp = 0, fov = 55, setup }) {
   const keep = { power: world.power, target: world.target, flicker: world.flicker, fov: camera.fov, aspect: camera.aspect, lamp: roomLamp.intensity };
@@ -477,10 +513,11 @@ function shot({ pos, at, power = 0, lamp = 0, fov = 55, setup }) {
   world.update(0);
   applyPower(power);
   roomLamp.intensity = lamp;
+  roomLamp.visible = lamp > 0;
   setup?.();
   camera.position.set(...pos); camera.lookAt(...at);
   camera.fov = fov; camera.aspect = 4 / 3; camera.updateProjectionMatrix();
-  renderer.setSize(960, 720, false);
+  renderer.setSize(isTouch ? 640 : 960, isTouch ? 480 : 720, false);
   renderer.clear();
   renderer.render(scene, camera);
   const url = canvas.toDataURL('image/jpeg', 0.86);
@@ -488,6 +525,7 @@ function shot({ pos, at, power = 0, lamp = 0, fov = 55, setup }) {
   world.update(0);
   applyPower(keep.power);
   roomLamp.intensity = keep.lamp;
+  roomLamp.visible = false;
   wardenModel.group.visible = vis.warden;
   camera.position.copy(camPos); camera.quaternion.copy(camQ);
   camera.fov = keep.fov; camera.aspect = keep.aspect; camera.updateProjectionMatrix();
@@ -535,10 +573,36 @@ function endingPanels() {
 
 // ---- the loop
 let lastT = performance.now();
+let perfT = 0, perfFrames = 0, perfSum = 0;
+// Every couple of seconds of play: too slow? drop the resolution a notch. Fast? raise it.
+function adaptResolution(raw) {
+  if (state !== 'playing' || raw > 0.25) return;
+  perfSum += raw; perfFrames++; perfT += raw;
+  if (perfT < 2) return;
+  const avg = perfSum / perfFrames;
+  perfT = perfSum = perfFrames = 0;
+  let next = pixelRatio;
+  if (avg > 1 / 40 && pixelRatio > 0.6) next = Math.max(0.6, pixelRatio - 0.2);
+  else if (avg < 1 / 57 && pixelRatio < MAX_PR) next = Math.min(MAX_PR, pixelRatio + 0.1);
+  if (next !== pixelRatio) {
+    pixelRatio = next;
+    renderer.setPixelRatio(pixelRatio);
+    sizeW = 0; resize();
+  }
+}
+
 function frame() {
   const now = performance.now();
-  const dt = Math.min((now - lastT) / 1000, 0.05);
+  const raw = (now - lastT) / 1000;
+  const dt = Math.min(raw, 0.05);
   lastT = now;
+  adaptResolution(raw);
+  // Held upright, a phone shows only the "turn it" card: don't burn battery drawing behind it.
+  if (isTouch && portrait.matches) {
+    if (state === 'playing') pause();
+    requestAnimationFrame(frame);
+    return;
+  }
   tick(dt);
   requestAnimationFrame(frame);
 }
@@ -575,6 +639,7 @@ function tick(dt) {
     noises.push(...pendingNoises.splice(0));
     inventoryKeys();
     interact(dt, noises);
+    updateTouchButtons(canUseNow);
 
     // Slipping through the grill while he holds it open.
     const grill = map.doors.get('25,6');

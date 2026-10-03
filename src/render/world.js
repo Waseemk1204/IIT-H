@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { WALL_H, areaName } from '../../shared/map.js';
 import { toon, inkBox, inkMesh, inkLines, canvasTexture, outlined } from './toon.js';
+import { mergeStatic } from './merge.js';
 
 const PAINT_H = 1.1;             // the green oil-paint band every hostel has
 const COMPOUND_H = 2.2;          // outer boundary wall
@@ -46,7 +47,8 @@ function signMesh(tex, w, h) {
   return m;
 }
 
-export function buildWorld(map) {
+// lite: fewer lights for phones.
+export function buildWorld(map, { lite = false } = {}) {
   const root = new THREE.Group();
   const isWall = (x, z) => x < 0 || z < 0 || x >= map.w || z >= map.h || map.cells[z][x] === '#';
   const outdoor = (z) => z >= 14;
@@ -175,6 +177,7 @@ export function buildWorld(map) {
     if (door.kind !== 'D') continue;
     const { x, z } = door;
     const pivot = new THREE.Group();
+    pivot.userData.dynamic = true;
     pivot.position.set(x + 0.05, 0, z + 0.5);
     const panel = inkBox(0.9, 2.15, 0.06, C.door, 0.45, 0, 0);
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), toon(0xd4b04a));
@@ -222,8 +225,10 @@ export function buildWorld(map) {
     fold.add(panel);
     const lock = inkMesh(new THREE.BoxGeometry(0.1, 0.12, 0.05), 0xd8b23a, 0.012);
     lock.position.set(len - 0.08, 1.2, 0.05);
+    lock.userData.dynamic = true;
     const lock2 = lock.clone(); lock2.position.z = -0.05;
     const anchor = new THREE.Group();
+    anchor.userData.dynamic = true;
     anchor.add(fold);
     if (alongX) {
       anchor.position.set(Math.min(...xs), 0, zs[0] + 0.5);
@@ -264,6 +269,7 @@ export function buildWorld(map) {
     loose.rotation.z = 0.25;
     const rubble = inkBox(0.6, 0.12, 0.4, 0x8a8478, cx, 0, cz + 0.8);
     rubble.visible = false;
+    grill.userData.dynamic = loose.userData.dynamic = rubble.userData.dynamic = true;
     root.add(grill, loose, rubble);
     windows.push({ door: d, grill, loose, rubble });
   }
@@ -294,12 +300,15 @@ export function buildWorld(map) {
   for (let x = 29; x < 41; x += 5) addTube(x, 8.5);
   addTube(30, 2.5);
   for (let i = 0; i < 5; i++) {
-    for (const zc of [3, 11]) { const f = fan(i * 5 + 2.5, zc); fans.push(f); root.add(f); }
+    for (const zc of [3, 11]) { const f = fan(i * 5 + 2.5, zc); f.userData.dynamic = true; fans.push(f); root.add(f); }
   }
   // The lights the tubes give off when the power is back (off until then).
   const powerLights = [];
-  for (const [x, z] of [[5.5, 7], [13, 7], [20.5, 7], [30, 8.5], [37, 8.5], [32, 11.5], [30, 2.5], [37.5, 2.5]]) {
-    const l = new THREE.PointLight(0xeef4ff, 0, 9, 1.4);
+  const spots = lite
+    ? [[9, 7], [19, 7], [33, 9.5], [33, 2.5]]
+    : [[5.5, 7], [13, 7], [20.5, 7], [30, 8.5], [37, 8.5], [32, 11.5], [30, 2.5], [37.5, 2.5]];
+  for (const [x, z] of spots) {
+    const l = new THREE.PointLight(0xeef4ff, 0, lite ? 13 : 9, lite ? 1.1 : 1.4);
     l.position.set(x, WALL_H - 0.3, z);
     root.add(l); powerLights.push(l);
   }
@@ -318,6 +327,7 @@ export function buildWorld(map) {
     plug.visible = false; boardG.add(plug); pluggedSlots.push(plug);
   }
   boardG.position.set(33.5, 0, 4.5);
+  boardG.userData.dynamic = true;
   root.add(boardG);
   const fuseBox = inkBox(0.5, 0.6, 0.15, 0x6d6d64, 36.5, 1.5, 1.08);
   root.add(fuseBox);
@@ -357,8 +367,11 @@ export function buildWorld(map) {
   board.rotation.y = Math.PI;
   root.add(board);
 
+  // Bake everything that never moves into a few big meshes.
+  const merged = mergeStatic(root);
+
   return {
-    root, doors, gates, tubes, lantern, radio,
+    root, doors, gates, tubes, lantern, radio, merged,
     power: 0,                  // 0 dark .. 1 lit; set by setPower, eased in update
     target: 0, flicker: 0,
     setPower(on, flicker = false) { this.target = on ? 1 : 0; this.flicker = on && flicker ? 1.6 : 0; },
@@ -375,7 +388,7 @@ export function buildWorld(map) {
       }
       this.power += (lit - this.power) * Math.min(1, dt * (lit < this.power ? 30 : 12));
       tubeMat.emissive.setScalar(this.power * 0.95);
-      for (const l of powerLights) l.intensity = this.power * 7;
+      for (const l of powerLights) l.intensity = this.power * (lite ? 9 : 7);
       for (const f of fans) {
         f.userData.speed += ((this.target ? 9 : 0) - f.userData.speed) * Math.min(1, dt * 0.6);
         f.userData.rotor.rotation.y += f.userData.speed * dt;
@@ -459,6 +472,7 @@ function almirah() {
   return g;
 }
 
+const leafMat = new THREE.MeshToonMaterial({ color: C.leaf, emissive: 0x08101c });
 function tree(x, z) {
   const g = new THREE.Group();
   const trunk = inkMesh(new THREE.CylinderGeometry(0.14, 0.2, 2.2, 8), C.trunk);
@@ -467,7 +481,7 @@ function tree(x, z) {
   const leaves = [[0, 2.7, 0, 1.1], [0.6, 2.3, 0.2, 0.75], [-0.5, 2.4, -0.3, 0.8]];
   for (const [lx, ly, lz, r] of leaves) {
     const m = inkMesh(new THREE.IcosahedronGeometry(r, 0), C.leaf, 0.04);
-    m.material = new THREE.MeshToonMaterial({ color: C.leaf, emissive: 0x08101c });
+    m.material = leafMat;
     m.position.set(lx, ly, lz);
     g.add(m);
   }
