@@ -361,3 +361,16 @@ body.touch #toasts { top: 64px; }
 body.touch #prompt { left: 42%; max-width: 46vw; font-size: 15px; text-align: center; }
 body.touch #prompt.hint { font-size: 12px; max-width: 46vw; padding: 4px 10px; }
 body.touch #prompt small { font-size: 11px; }
+
+/* ---------- five chances ---------- */
+#chances { display: inline-flex; gap: 1px; margin-left: 4px; font-size: 15px; letter-spacing: 0; }
+#chances .gone { filter: grayscale(1) brightness(.6); opacity: .35; }
+#chances.last span:not(.gone) { animation: shake .3s infinite; }
+#caught-count .bowls { font-size: 22px; letter-spacing: 2px; margin-right: 6px; }
+#caught-count .bowls i { font-style: normal; filter: grayscale(1); opacity: .35; }
+#caught-warn { font-family: var(--comic); font-size: 24px; letter-spacing: 1px; color: var(--red); margin: 4px 0 0; }
+#caught-warn:empty { display: none; }
+.det-panel { background: #f2c230; }
+.det-panel .boom { color: var(--red); }
+#det-lines { font-weight: 700; font-size: 18px; }
+body.touch #chances { font-size: 12px; }

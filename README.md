@@ -66,6 +66,9 @@ Distractions: throw a steel glass or tennis ball, leave your phone with an alarm
 confiscates it if he finds it), switch on the common-room radio, or knock on a sleeping
 student's door. The sleeping chowkidar wakes to loud noise and shouts for the warden. Get
 caught and whatever you are holding goes into the warden's almirah (you can steal it back).
+You get **five chances**: the HUD shows five bowls of Maggi, and each catch takes one. The
+fifth time, Warden Saab rings your parents ("KYAAA?! Exam se pehle?!") and the night ends
+in detention, writing "Lights off = SONA" until 6 AM while he eats your Maggi.
 Reach the Maggi stall for the score card: improvised answers beat sneaky ones, which beat
 keys, which beat brute force.
 
@@ -127,3 +130,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | Phase 4 code: touch controls and phone layout, objective line, deadline and time bonus, best score, pause settings, icon and manifest. |
 | 3 Oct 2026 | Claude Code (Anthropic) | 3D item models, first-person hands with use animations (rummage, pick, swing, throw, combine, twist...), Bhaiya the Maggi wala NPC with steam and call-outs. |
 | 3 Oct 2026 | Claude Code (Anthropic) | Comic pages that fit the screen, full screen buttons, phone optimisation (static mesh merging, lite lighting, adaptive resolution, contextual touch buttons, haptics), portrait blocked. |
+| 3 Oct 2026 | Claude Code (Anthropic) | Five chances with a HUD counter and last-chance warning; the parents-call and detention comic ending. |

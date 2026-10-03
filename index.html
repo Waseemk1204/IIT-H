@@ -25,7 +25,7 @@
 
   <!-- HUD -->
   <div id="hud">
-    <div id="status-left" class="chip"><span id="clock">1:30 AM</span><span id="area">Room 106</span></div>
+    <div id="status-left" class="chip"><span id="clock">1:30 AM</span><span id="area">Room 106</span><span id="chances" title="Chances"></span></div>
     <div id="objective"></div>
     <div id="status-right"><span id="stance" class="chip">WALKING</span><span id="torch-state" class="chip">TORCH OFF</span><button class="chip fs-btn fs-hud" aria-label="Full screen" title="Full screen">⛶</button></div>
     <div id="meter"><span id="meter-label">Kuch dikha?</span><div id="meter-bar"><div id="meter-fill"></div></div></div>
@@ -74,6 +74,7 @@
         <span><b>Click / V</b> throw</span><span><b>P</b> pause</span><span><b>M</b> mute</span>
       </div>
       <p class="tips">Darkness hides you. His torch beam doesn't. Neither does yours.<br>
+        Sirf 5 chances. Paanchvi baar pakde gaye toh... papa ko phone.<br>
         Pehle toh... roommate ne tumhe bahar se lock kar diya hai.</p>
       <p class="fine">IIT-H Game Jam · Comic · Twist · Light · AI-assisted, see README</p>
     </div>
@@ -105,6 +106,7 @@
       <p id="caught-line" class="speech"></p>
       <p id="caught-taken"></p>
       <p id="caught-count"></p>
+      <p id="caught-warn"></p>
       <p class="fine">Click or press any key to go back to your room</p>
     </div>
   </section>
@@ -118,6 +120,17 @@
         <button id="comic-skip" class="btn ghost">SKIP (Esc)</button>
         <button id="comic-next" class="btn">AAGE →</button>
       </div>
+    </div>
+  </section>
+
+  <!-- Five strikes -->
+  <section id="detention" class="overlay">
+    <div class="panel caught-panel det-panel">
+      <div class="boom">DETENTION!</div>
+      <p class="speech">"Papa ko phone kar diya hai. Ab subah tak likho."</p>
+      <p id="det-lines"></p>
+      <p class="total">JUGAAD SCORE: <b id="det-score">0</b></p>
+      <button id="det-again" class="btn">PHIR SE KOSHISH</button>
     </div>
   </section>
 

@@ -16,7 +16,7 @@ import { createChowkidarModel } from './render/chowkidar.js';
 import { createWorldItems } from './render/items.js';
 import { createViewmodel, ACTION_ANIM } from './render/viewmodel.js';
 import { createBhaiya } from './render/bhaiya.js';
-import { inkBox } from './render/toon.js';
+import { inkBox, canvasTexture } from './render/toon.js';
 import { createInput, isTouch } from './input.js';
 import { createPlayer, updatePlayer, respawn, forward, RADIUS } from './player.js';
 import { findTarget, landingPoint } from './interact.js';
@@ -25,7 +25,8 @@ import * as sfx from './audio.js';
 
 const START_MINUTES = 90;            // 1:30 AM
 const MINUTES_PER_SECOND = 1 / 10;   // game clock: 1:30 to 3:00 AM is 15 real minutes
-const CLOSING = 180;                 // 3:00 AM: Bhaiya pulls the shutter down
+const CLOSING = 180;
+const CHANCES = 5;                   // caught this many times: Papa ko phone, detention                 // 3:00 AM: Bhaiya pulls the shutter down
 const CAUGHT_LINES = [
   'Raat ke do baje Maggi?! Chal kamre mein!',
   'Exam kal hai aur janab ghoom rahe hain!',
@@ -160,6 +161,7 @@ sens.value = sensitivity;
 sens.addEventListener('input', () => { sensitivity = Number(sens.value); store.set('sens', sensitivity); });
 document.getElementById('restart').addEventListener('click', () => location.reload());
 document.getElementById('late-again').addEventListener('click', () => location.reload());
+document.getElementById('det-again').addEventListener('click', () => location.reload());
 
 // Full screen: the buttons on the title, pause menu and HUD all toggle it.
 const fsButtons = document.querySelectorAll('.fs-btn');
@@ -242,8 +244,9 @@ function objective() {
 }
 
 function getCaught() {
-  state = 'caught';
   caughtCount++;
+  if (caughtCount >= CHANCES) { detention(); return; }
+  state = 'caught';
   caughtReady = false;
   hold = null;
   sfx.sting('caught');
@@ -254,10 +257,81 @@ function getCaught() {
   document.getElementById('caught-line').textContent = `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
   document.getElementById('caught-taken').textContent = taken
     ? `${ITEMS[taken].icon} ${ITEMS[taken].name} confiscate! (Uski almirah mein gaya...)` : '';
-  document.getElementById('caught-count').textContent = `Pakde gaye: ${caughtCount} baar`;
+  const left = CHANCES - caughtCount;
+  document.getElementById('caught-count').innerHTML = `<span class="bowls">${'🍜'.repeat(left)}<i>${'🍜'.repeat(caughtCount)}</i></span> Chances bache: <b>${left}</b>`;
+  document.getElementById('caught-warn').textContent = left === 1 ? 'Ek aur baar... aur PAPA KO PHONE!' : '';
   document.exitPointerLock?.();
   showOverlay('caught');
   setTimeout(() => { caughtReady = true; }, 900);
+}
+
+// The detention notebook, only ever seen in that comic panel.
+const notebook = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.3), new THREE.MeshToonMaterial({
+  map: canvasTexture(512, 360, (ctx, w, h) => {
+    ctx.fillStyle = '#f7f3e6'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#9fb7d8'; ctx.lineWidth = 2;
+    for (let y = 36; y < h; y += 26) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    ctx.strokeStyle = '#d66'; ctx.beginPath(); ctx.moveTo(48, 0); ctx.lineTo(48, h); ctx.stroke();
+    ctx.fillStyle = '#1b2a6b'; ctx.font = 'italic 22px "Comic Neue", "Comic Sans MS", cursive';
+    for (let i = 0, y = 31; y < h; y += 26, i++) ctx.fillText(`${i + 1}. Lights off = SONA.`, 56, y);
+  }),
+}));
+notebook.rotation.set(-Math.PI / 2, 0, 0.25);
+notebook.position.set(30.75, 0.765, 3.15);
+notebook.visible = false;
+scene.add(notebook);
+
+// Five strikes: the warden rings home, and the night ends in detention.
+async function detention() {
+  state = 'detention';
+  hold = null;
+  jug.seated = null;
+  document.exitPointerLock?.();
+  sfx.setTension(0);
+  sfx.sting('caught');
+  buzz([200, 80, 200, 80, 400]);
+  if (!window.__skipComics) await playComic(detentionPanels(), { title: 'Paanchvi baar...' });
+  const s = score(jug, caughtCount);
+  const used = jug.log.filter((l) => l.kind !== 'time').length;
+  document.getElementById('det-lines').textContent =
+    `Pakde gaye: ${caughtCount}/${CHANCES}. Jugaad kiye: ${used}. Maggi: 0.`;
+  document.getElementById('det-score').textContent = Math.max(0, s.total);
+  showOverlay('detention');
+}
+
+function detentionPanels() {
+  const atDesk = (look) => () => {
+    wardenModel.group.visible = false;
+    cutWarden.group.visible = true;
+    cutWarden.update({ x: 37.6, z: 2.4, yaw: 0.8, lookOffset: look, moving: false, mode: 'patrol', meter: 0 }, 0);
+  };
+  const lamp = { power: 1, lamp: 5, lampAt: [37.5, 2.6, 2.8] };
+  const p1 = shot({ pos: [39.7, 1.6, 4.4], at: [37.5, 1.4, 2.4], ...lamp, setup: atDesk(0) });
+  const p2 = shot({ pos: [38.6, 1.7, 3.6], at: [37.0, 1.5, 2.2], fov: 40, ...lamp, setup: atDesk(-0.6) });
+  cutWarden.group.visible = false;
+  notebook.visible = true;
+  const p3 = shot({ pos: [31.45, 1.3, 3.75], at: [30.75, 0.76, 3.15], fov: 50, power: 1, lamp: 5, lampAt: [31, 2.4, 3.2] });
+  notebook.visible = false;
+  const stall = () => {
+    wardenModel.group.visible = false;
+    cutWarden.group.visible = true;
+    cutWarden.update({ x: 36.15, z: 17.6, yaw: 0, lookOffset: 0, moving: false, mode: 'patrol', meter: 0 }, 0);
+    bowls.forEach((b) => { b.visible = true; });
+    bowls[1].position.set(35.5, 0.95, 18.35);
+  };
+  const lanternWas = world.lantern.intensity;
+  world.lantern.intensity = 4.5;
+  const p4 = shot({ pos: [33.9, 1.55, 16.4], at: [36.1, 1.2, 18.0], fov: 50, setup: stall });
+  world.lantern.intensity = lanternWas;
+  cutWarden.group.visible = false;
+  bowls.forEach((b) => { b.visible = false; });
+  return [
+    { img: p1, caption: "Warden's office. Phone uthaya.", sfx: { text: 'TRRING!', x: 6, y: 62, rot: -8 },
+      bubbles: [{ text: 'Hello? Room 106 ke papa? Aapka bachcha raat ke 2 baje MAGGI dhoond raha tha!', x: 50, y: 6 }] },
+    { img: p2, caption: 'Speakerphone pe, ghar se:', bubbles: [{ text: 'KYAAA?! Exam se pehle?! Ghar aa, phir batata hoon!!', x: 3, y: 56, shout: true }] },
+    { img: p3, caption: 'DETENTION. Common room, subah 6 baje tak.', bubbles: [{ text: 'Sirf 497 baar aur...', x: 52, y: 12 }] },
+    { img: p4, caption: '...aur Maggi? Woh Warden Saab ne kha li.', sfx: { text: 'SLURRRRP', x: 48, y: 30, rot: -10 } },
+  ];
 }
 
 function backToRoom() {
@@ -505,7 +579,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ---- comic panels, rendered by the engine
-function shot({ pos, at, power = 0, lamp = 0, fov = 55, setup }) {
+function shot({ pos, at, power = 0, lamp = 0, lampAt = [2.5, 2.6, 10.5], fov = 55, setup }) {
+  roomLamp.position.set(...lampAt);
   const keep = { power: world.power, target: world.target, flicker: world.flicker, fov: camera.fov, aspect: camera.aspect, lamp: roomLamp.intensity };
   const camPos = camera.position.clone(), camQ = camera.quaternion.clone();
   const vis = { warden: wardenModel.group.visible };
@@ -720,6 +795,7 @@ function tick(dt) {
   worldItems.update(dt, jug.worldItems, time);
   world.update(dt);
   hud.setMeter(warden.meter, warden.mode);
+  hud.setChances(CHANCES - caughtCount, CHANCES);
   hud.setStatus({ minutes, areaName: areaName(player.x, player.z), torch: player.torch, crouch: player.crouch, running: player.running });
   hud.setInventory(jug, recipeFor(jug));
   hud.setHold(hold ? hold.t / hold.action.hold : 0);

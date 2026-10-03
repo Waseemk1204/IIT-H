@@ -11,7 +11,8 @@ export function createHud() {
   const torchEl = $('torch-state'), stanceEl = $('stance');
   const layer = $('bubbles'), subtitle = $('subtitle');
   const inv = $('inventory'), invInfo = $('inv-info'), holdEl = $('hold'), toasts = $('toasts'), pop = $('bigpop');
-  let lastPrompt = '', lastInv = '', lastObjective = '';
+  let lastPrompt = '', lastInv = '', lastObjective = '', lastChances = -1;
+  const chances = $('chances');
   const objective = $('objective');
   const bubbles = [];
   const v = new THREE.Vector3();
@@ -68,6 +69,18 @@ export function createHud() {
     bigPop(text) {
       pop.textContent = text;
       pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go');
+    },
+    setChances(left, total) {
+      if (left === lastChances) return;
+      lastChances = left;
+      chances.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const b = document.createElement('span');
+        b.textContent = '🍜';
+        if (i >= left) b.className = 'gone';
+        chances.appendChild(b);
+      }
+      chances.classList.toggle('last', left === 1);
     },
     setObjective(text, late) {
       if (text === lastObjective) return;
