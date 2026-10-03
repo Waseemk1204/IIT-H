@@ -10,6 +10,8 @@
 //   D  room door                    G  wing grill gate (locked, see-through)
 //   M  main gate (locked, see-through)
 //   o  outside ground               P  player start (floor)
+//   W  loose window grill (see-through; a bat can break it)
+//   k  the chowkidar, asleep on his chair (low)
 export const ROWS = [
   '##########################################',
   '#bb.c#bb.c#bb.c#bb.c#bb.c#s.cc...s#c...bb#',
@@ -23,8 +25,8 @@ export const ROWS = [
   '#t..t#t..t#t..t#t..t#t..t#...............#',
   '#.P..#....#....#....#....#..#.........#..#',
   '#....#....#....#....#....#..........tt...#',
-  '#bb.c#bb.c#bb.c#bb.c#bb.c#c.............c#',
-  '###############################MMM########',
+  '#bb.c#bb.c#bb.c#bb.c#bb.c#c.......k.....c#',
+  '###########################W###MMM########',
   '#oooooooooooooooooooooooooooooooooooooooo#',
   '#ooooTooooooooooTooooooooooooooooooooooTo#',
   '#oooooooooooooooooooooooooooooooooooooooo#',
@@ -36,7 +38,7 @@ export const ROWS = [
 ];
 
 export const WALL_H = 3;
-export const LOW = new Set(['b', 't', 's', 'Q']);
+export const LOW = new Set(['b', 't', 's', 'Q', 'k']);
 export const TALL = new Set(['#', 'c', 'T']);
 export const GATES = new Set(['G', 'M']);
 
@@ -66,7 +68,7 @@ export function createMap(rows = ROWS) {
     for (let x = 0; x < w; x++) {
       const c = cells[z][x];
       if (c === 'P') { spawn = { x: x + 0.5, z: z + 0.5 }; cells[z][x] = '.'; }
-      if (c === 'D' || c === 'G' || c === 'M') {
+      if (c === 'D' || c === 'G' || c === 'M' || c === 'W') {
         doors.set(key(x, z), { x, z, kind: c, open: false, locked: c !== 'D' });
       }
     }
@@ -91,7 +93,7 @@ export function solidForPlayer(map, cx, cz) {
   if (cx < 0 || cz < 0 || cx >= map.w || cz >= map.h) return true;
   const c = map.cells[cz][cx];
   if (c === '.' || c === 'o') return false;
-  if (c === 'D' || c === 'G' || c === 'M') return !doorAt(map, cx, cz).open;
+  if (c === 'D' || c === 'G' || c === 'M' || c === 'W') return !doorAt(map, cx, cz).open;
   return true;
 }
 

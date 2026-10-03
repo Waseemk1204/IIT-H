@@ -84,3 +84,12 @@ test('he opens the grill gate with his key and locks it behind him', () => {
   assert.equal(gate.open, false);
   assert.equal(map.doors.get('25,7').open, false);
 });
+
+test('a shout from somewhere he cannot stand still brings him to the nearest floor', () => {
+  const map = createMap();
+  const w = createWarden(map, { x: 37.5, z: 7.5 }, WARDEN_ROUTE);
+  run(w, 0.1, away, (t) => (t < 0.06 ? [{ x: 34.5, z: 12.5, r: 30 }] : []));   // the chowkidar's chair
+  assert.equal(w.mode, 'investigate');
+  run(w, 8);
+  assert.ok(Math.hypot(w.x - 34.5, w.z - 12.5) < 2.5, `ended at ${w.x},${w.z}`);
+});

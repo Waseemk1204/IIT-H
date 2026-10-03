@@ -1,7 +1,7 @@
 // Warden Saab: patrols with a torch, sees what his torch (or yours) lights
 // up, and comes to look when he hears something. Pure logic: the renderer
 // reads his state, and the tests drive it directly.
-import { findPath, lineOfSight, doorAt } from './map.js';
+import { findPath, lineOfSight, doorAt, walkableForWarden } from './map.js';
 
 export const SPEED = { patrol: 1.25, investigate: 1.7, chase: 2.7 };
 export const BEAM_HALF_ANGLE = 0.3;   // radians, matches the visible cone
@@ -74,7 +74,26 @@ export function sightRate(w, p, map) {
   return rate;
 }
 
+// The closest cell he can actually stand in (noises come from beds, chairs...).
+function nearestWalkable(map, x, z) {
+  const cx = Math.floor(x), cz = Math.floor(z);
+  if (walkableForWarden(map, cx, cz)) return { x, z };
+  for (let r = 1; r <= 3; r++) {
+    let best = null, bd = Infinity;
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dz)) !== r || !walkableForWarden(map, cx + dx, cz + dz)) continue;
+      const d = Math.hypot(cx + dx + 0.5 - x, cz + dz + 0.5 - z);
+      if (d < bd) { bd = d; best = { x: cx + dx + 0.5, z: cz + dz + 0.5 }; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
 function setPath(w, tx, tz) {
+  const goal = nearestWalkable(w.map, tx, tz);
+  if (!goal) { w.path = null; return false; }
+  tx = goal.x; tz = goal.z;
   const path = findPath(w.map, w.x, w.z, tx, tz);
   w.path = path; w.pathI = path ? 1 : 0;
   return !!path;
@@ -115,7 +134,7 @@ function closeGatesBehind(w, events) {
   for (const door of w.map.doors.values()) {
     if (!door.byWarden || !door.open) continue;
     const d = Math.hypot(door.x + 0.5 - w.x, door.z + 0.5 - w.z);
-    if (d > 1.8) {
+    if (d > 3) {                 // a moment to slip through behind him
       door.open = false; door.byWarden = false;
       events.push({ type: 'door', door, by: 'warden', closed: true });
     }

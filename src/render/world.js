@@ -198,7 +198,7 @@ export function buildWorld(map) {
   }
 
   // ---- Gates: collapsible steel grills that fold up when opened
-  const gateCells = [...map.doors.values()].filter((d) => d.kind !== 'D');
+  const gateCells = [...map.doors.values()].filter((d) => d.kind === 'G' || d.kind === 'M');
   const groups = [];
   for (const d of gateCells) {
     const g = groups.find((gr) => gr.kind === d.kind);
@@ -246,6 +246,40 @@ export function buildWorld(map) {
     gates.push({ cells: g.cells, fold, locks: [lock, lock2], amount: 0, center: alongX
       ? { x: Math.min(...xs) + len / 2, z: zs[0] + 0.5 } : { x: xs[0] + 0.5, z: Math.min(...zs) + len / 2 } });
   }
+
+  // ---- The loose window grill in the lobby's south wall
+  const windows = [];
+  for (const d of map.doors.values()) {
+    if (d.kind !== 'W') continue;
+    const cx = d.x + 0.5, cz = d.z + 0.5;
+    root.add(inkBox(1, 0.9, 1, C.paint, cx, 0, cz));                       // sill
+    root.add(inkBox(1, WALL_H - 2.1, 1, C.distemper, cx, 2.1, cz));         // lintel
+    const bars = [];
+    for (let i = 1; i < 8; i++) bars.push({ w: 0.025, h: 1.2, d: 0.025, x: i / 8 - 0.5, y: 1.5, z: 0 });
+    bars.push({ w: 1, h: 0.04, d: 0.04, x: 0, y: 1.5, z: 0 });
+    const grill = new THREE.Mesh(mergeBoxes(bars), toon(C.steel));
+    grill.position.set(cx, 0, cz);
+    // one bar already hanging loose
+    const loose = inkBox(0.025, 1.2, 0.025, C.steel, cx + 0.31, 0.9, cz + 0.06, 0.006);
+    loose.rotation.z = 0.25;
+    const rubble = inkBox(0.6, 0.12, 0.4, 0x8a8478, cx, 0, cz + 0.8);
+    rubble.visible = false;
+    root.add(grill, loose, rubble);
+    windows.push({ door: d, grill, loose, rubble });
+  }
+
+  // ---- The common room radio, on the cabinet
+  const radio = new THREE.Group();
+  radio.add(inkBox(0.45, 0.24, 0.16, 0x7a3b22, 0, 0, 0, 0.01));
+  const grille = inkBox(0.2, 0.16, 0.01, 0xd9c08a, -0.08, 0.04, 0.085, 0.004);
+  const dial = inkMesh(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 10), 0xd9c08a, 0.004);
+  dial.rotation.x = Math.PI / 2; dial.position.set(0.13, 0.12, 0.085);
+  const antenna = inkBox(0.008, 0.4, 0.008, 0xbbbbbb, 0.18, 0.24, 0, 0.003);
+  antenna.rotation.z = -0.4;
+  radio.add(grille, dial, antenna);
+  radio.position.set(28.6, 1.85, 1.5);
+  radio.rotation.y = 0;
+  root.add(radio);
 
   // ---- Fixtures: switched-off tube lights and ceiling fans (Act 2 turns them on)
   const tubes = [];
@@ -295,8 +329,13 @@ export function buildWorld(map) {
   root.add(board);
 
   return {
-    root, doors, gates, tubes, lantern,
+    root, doors, gates, tubes, lantern, radio,
     update(dt) {
+      for (const w of windows) {
+        const broken = w.door.open;
+        w.grill.visible = w.loose.visible = !broken;
+        w.rubble.visible = broken;
+      }
       for (const d of doors.values()) {
         const target = d.door.open ? d.swing : 0;
         d.angle += (target - d.angle) * Math.min(1, dt * 7);

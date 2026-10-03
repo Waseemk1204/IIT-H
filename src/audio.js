@@ -95,6 +95,9 @@ export function sting(kind) {
     noiseBurst(o, { dur: 0.25, freq: 1500, q: 0.5, vol: 0.6, type: 'lowpass' });
   } else if (kind === 'chase') {
     for (let i = 0; i < 3; i++) tone(o, { f0: 880, f1: 860, dur: 0.09, type: 'square', vol: 0.07, at: i * 0.12 });
+  } else if (kind === 'got') {
+    tone(o, { f0: 660, dur: 0.08, type: 'triangle', vol: 0.12 });
+    tone(o, { f0: 990, dur: 0.12, type: 'triangle', vol: 0.12, at: 0.08 });
   } else {
     tone(o, { f0: 300, f1: 900, dur: 0.25, type: 'triangle', vol: 0.15 });
   }
