@@ -18,7 +18,8 @@ const DOOR_SEE = 8;                   // how far away he notices an open door
 
 // Hunting (alert = 1): everything a notch sharper.
 export const HUNT = { speed: 1.35, range: 1.3, fov: 1.3, rate: 1.4, hear: 1.3, decay: 0.6, wait: 0.4 };
-const k = (w, key) => (w.alert ? HUNT[key] : 1);
+// Hunting multipliers, times the difficulty's (w.diff = { rate, speed, range }).
+const k = (w, key) => (w.alert ? HUNT[key] : 1) * (w.diff?.[key] ?? 1);
 
 // Angle a - b wrapped to [-PI, PI].
 export function angleDiff(a, b) {
@@ -94,7 +95,7 @@ export function sightRate(w, p, map) {
     if (bodyOff < LIT_FOV * k(w, 'fov')) rate = 0.35 + 1.4 * Math.max(0, 1 - dist / R) ** 1.3;
     else if (dist < 2.5 && bodyOff < 1.9) rate = 0.9;
     if (p.crouch) rate *= 0.75;
-    return rate * k(w, 'rate');
+    return rate * k(w, 'rate') * (1 - (p.cover || 0));
   }
   if (off < BEAM_HALF_ANGLE + 0.04 && dist < BEAM_RANGE * k(w, 'range')) {
     rate = 0.25 + 1.4 * Math.max(0, 1 - dist / (12 * k(w, 'range'))) ** 2;   // caught in his beam
@@ -104,7 +105,7 @@ export function sightRate(w, p, map) {
     rate = 0.9;                                                               // right under his nose
   }
   if (p.crouch && !p.torch) rate *= 0.6;
-  return rate * k(w, 'rate');
+  return rate * k(w, 'rate') * (1 - (p.cover || 0));
 }
 
 // The closest cell he can actually stand in (noises come from beds, chairs...).

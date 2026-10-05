@@ -41,6 +41,9 @@
     <div id="prompt"></div>
     <div id="subtitle"></div>
     <div id="bubbles"></div>
+    <div id="dum"><span>DUM</span><div id="dum-bar"><div id="dum-fill"></div></div></div>
+    <div id="calm"></div>
+    <div id="hurt"></div>
   </div>
 
   <!-- Touch controls (phones) -->
@@ -55,6 +58,7 @@
       <button data-key="KeyV" class="tb">THROW</button>
       <button data-key="KeyG" class="tb">JODO</button>
       <button data-key="KeyQ" class="tb">DROP</button>
+      <button data-key="Punch" class="tb punch" hidden>MAARO</button>
     </div>
     <button data-key="KeyP" class="tb" id="tpause" aria-label="Pause">II</button>
   </div>
@@ -68,6 +72,12 @@
       <p class="blurb">1:30 AM. Endsem kal hai. The hostel gate has been locked since 11, your stomach is
         growling, and the whole block just went dark. Bhaiya's Maggi Point is open till 3.
         Warden Saab is awake, and he has a torch.</p>
+      <div class="diff-pick" role="group" aria-label="Difficulty">
+        <button class="diff-btn" data-diff="easy">🙂 AASAAN</button>
+        <button class="diff-btn" data-diff="normal">😐 THEEK-THAAK</button>
+        <button class="diff-btn" data-diff="hard">😈 WARDEN MODE</button>
+      </div>
+      <p id="diff-blurb" class="diff-blurb"></p>
       <button id="start" class="btn">CHUPKE SE NIKLO →</button>
       <button class="btn ghost fs-btn fs-label">⛶ FULL SCREEN</button>
       <p class="touch-only fine">Phone pe: left thumb se chalo, right side drag karke dekho. Landscape + fullscreen best hai.</p>
@@ -75,7 +85,7 @@
         <span><b>WASD</b> move</span><span><b>Mouse</b> look</span><span><b>Shift</b> run (loud!)</span>
         <span><b>C</b> crouch</span><span><b>F</b> phone torch</span><span><b>E</b> use / hold E</span>
         <span><b>1–6</b> pick item</span><span><b>G</b> combine</span><span><b>Q</b> drop (phone: alarm)</span>
-        <span><b>Click / V</b> throw</span><span><b>P</b> pause</span><span><b>M</b> mute</span>
+        <span><b>V</b> throw</span><span><b>Left click</b> fight (jhagde mein)</span><span><b>P</b> pause</span><span><b>M</b> mute</span>
       </div>
       <p class="tips">Darkness hides you. His torch beam doesn't. Neither does yours.<br>
         Maggi order karo, ek minute chhupo, plate leke Room 106 wapas aao, aur chupke se khao.<br>

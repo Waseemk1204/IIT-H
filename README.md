@@ -48,7 +48,14 @@ Starting the game goes full screen where the browser allows it.
 
 **Controls:** WASD move · mouse look (click to lock; drag also works) · Shift run (loud) ·
 C crouch · F phone torch · E use (hold E for longer jobs) · 1–6 or mouse wheel pick an item ·
-G combine · Q drop (the phone: set an alarm and leave it) · click or V throw · P pause · M mute.
+G combine · Q drop (the phone: set an alarm and leave it) · click or V throw · **left click
+to fight** (in the brawl) · P pause · M mute.
+
+**Difficulty** (pick on the title screen, remembered): 🙂 Aasaan (gentler warden, 7 chances,
+only the item in your hand is confiscated, 15 minutes, score ×0.75) · 😐 Theek-thaak (5
+chances, everything confiscated, 12 minutes) · 😈 Warden Mode (sharper and faster warden,
+frequent room checks, 3 chances, a bigger brawl, 10 minutes, score ×1.5). Best scores are
+kept per difficulty.
 
 ## Status
 
@@ -97,10 +104,17 @@ Get caught with the plate and he eats it; you have to order again.
 Finish the plate for the score card: improvised answers beat sneaky ones, which beat
 keys, which beat brute force.
 
-**Phase 3 (done):** the twist. Get through the grill gate and the power comes back: tube
-lights stutter on, fans spin up, the whole block cheers, and students pour into the corridor
-and lobby to cram in study circles. Darkness no longer hides you; Warden Saab puts his torch
-away and sees anything in front of him. Two answers:
+**Phase 3 (done):** the twist. Get through the grill gate (or just wait: at 2:00 AM it
+happens wherever you are) and the power comes back: tube lights stutter on, fans spin up...
+and a **brawl** breaks out. "DHISHOOM! Kisne meri Maggi khaayi?!" Brawlers burst through the
+grill and fill the lobby and the wing. Fight your way back to Room 106 (left click to punch;
+two punches, or one swing of the cricket bat, puts someone down; watch for the "!" windup and
+step back to dodge), keep an eye on your DUM bar (zero and you're carted off: a catch), and
+stay out of Warden Saab's sight: he plants himself in the lobby yelling and glaring around,
+and a brawler between you and him hides you. Once in your room, stay put for **ten seconds**
+while it all calms down (step out and the count restarts). Then the studious ones (who never
+stopped cramming) are in their study circles, the lights are on, and Darkness no longer
+hides you; Warden Saab puts his torch away and sees anything in front of him. Two answers:
 
 - **Hide in plain sight:** borrow a book from a study circle and sit down to cram. He walks
   right past ("Shabash! Aise hi padhai karo sab.").
@@ -136,6 +150,9 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | `src/cutscenes.js` | Comic-page cutscenes built from engine-rendered panels |
 | `src/input.js` | Keyboard, mouse, and the phone joystick, look-drag and buttons |
 | `src/tutorial.js` | The first-room tutorial: steps that finish when you do the thing |
+| `shared/difficulty.js` | The three difficulty levels and everything they scale |
+| `shared/brawl.js` | The lights-on brawl: brawlers, windups, punches, KOs, crowd cover, the 10-second calm-down (tested) |
+| `src/render/brawlers.js` | The brawlers: fists up, windups, swings, knocked out under spinning stars |
 | `src/main.js` | Renderer, the game loop, and the glue between player, warden and HUD |
 | `src/player.js` | First-person movement, crouch, run, footstep noise |
 | `src/render/world.js` | Builds the hostel in 3D from the grid |
@@ -160,3 +177,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | New win: order at the stall, hide while the warden patrols outside, carry the Maggi back (smell, no running), eat it in Room 106; new ending comic. |
 | 3 Oct 2026 | Claude Code (Anthropic) | First-room tutorial with step cards, a 3D pointer arrow, clock freeze, skip and replay. |
 | 5 Oct 2026 | Claude Code (Anthropic) | Difficulty pass: sharper lights-on sight, Room 106 checks and hunt mode, the warden shuts and relocks doors and gates, master key and desk key, confiscate-all on catch, 12-minute clock, tests. |
+| 5 Oct 2026 | Claude Code (Anthropic) | Difficulty selector; the lights-on brawl (fighting, DUM bar, crowd cover, 10-second calm-down in your room), lights come on at 2:00 AM regardless; tests. |

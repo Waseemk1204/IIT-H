@@ -555,6 +555,11 @@ export function canOpen(st, which) {
   return true;
 }
 
+// Walked through the grill while the brawl had it flung open.
+export function crossedOpenGrill(st) {
+  solve(st, 'grill', 'sneaky', 'Jhagde mein khule grill se nikal gaye');
+}
+
 // Slipped out through the main gate while he had it open.
 export function tailgatedMain(st) {
   solve(st, 'main', 'sneaky', 'Warden Saab ke peeche-peeche main gate se nikal gaye');

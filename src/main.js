@@ -1,14 +1,17 @@
 // Boots the game: renderer, scene, the loop, and the glue between you,
 // Warden Saab, the jugaad rules and the screen.
 import * as THREE from 'three';
-import { createMap, WARDEN_START, WARDEN_ROUTE, OUTSIDE_ROUTE, inMyRoom, areaName } from '../shared/map.js';
+import { createMap, WARDEN_START, WARDEN_ROUTE, OUTSIDE_ROUTE, inMyRoom, areaName, moveCircle } from '../shared/map.js';
 import { createWarden, updateWarden, resumePatrol, sendWarden, isBehind } from '../shared/warden-ai.js';
 import {
   ITEMS, MY_DOOR, SMELL_R, loseMaggi, createJugaad, actionsFor, perform, lockedHint, combine, recipeFor,
-  selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateAll, canOpen, tailgated, tailgatedMain, score,
+  selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateAll, confiscateHeld, canOpen, tailgated, tailgatedMain, crossedOpenGrill, score,
   startAct2, restorePower, STUDY_CIRCLES, FUSE_BOX,
 } from '../shared/jugaad.js';
 import { createStudents } from './render/students.js';
+import { createBrawlers } from './render/brawlers.js';
+import { getDifficulty, DIFFICULTY } from '../shared/difficulty.js';
+import { createBrawl, updateBrawl, playerPunch, tickCalm, crowdCover, CALM_TIME, PLAYER_HP } from '../shared/brawl.js';
 import { playComic } from './cutscenes.js';
 import { createTutorial } from './tutorial.js';
 import { buildWorld } from './render/world.js';
@@ -26,10 +29,13 @@ import { createHud, showOverlay } from './hud.js';
 import * as sfx from './audio.js';
 
 const START_MINUTES = 90;            // 1:30 AM
-const MINUTES_PER_SECOND = 1 / 8;    // game clock: 1:30 to 3:00 AM is 12 real minutes to order
-const ROOM_CHECK = { first: 70, calm: 85, hunting: 60 };   // seconds between his checks on Room 106
-const CLOSING = 180;
-const CHANCES = 5;                   // caught this many times: Papa ko phone, detention                 // 3:00 AM: Bhaiya pulls the shutter down
+const CLOSING = 180;                 // 3:00 AM: Bhaiya pulls the shutter down
+const BRAWL_AT = 120;                // 2:00 AM: the lights come back (and the brawl starts) no matter where you are
+// Set from the difficulty picked on the title screen (see shared/difficulty.js).
+let diff = getDifficulty('normal');
+let MINUTES_PER_SECOND = 90 / (diff.clockMinutes * 60);   // 1:30 to 3:00 AM in real minutes
+let ROOM_CHECK = diff.roomCheck;     // seconds between his checks on Room 106
+let CHANCES = diff.chances;          // caught this many times: Papa ko phone, detention
 const CAUGHT_LINES = [
   'Raat ke do baje Maggi?! Chal kamre mein!',
   'Exam kal hai aur janab ghoom rahe hain!',
@@ -230,6 +236,20 @@ document.addEventListener('webkitfullscreenchange', syncFullscreenButtons);
 syncFullscreenButtons();
 
 const portrait = matchMedia('(orientation: portrait)');
+// ---- difficulty picker on the title screen
+function applyDifficulty(id) {
+  diff = getDifficulty(id);
+  store.set('diff', diff.id);
+  MINUTES_PER_SECOND = 90 / (diff.clockMinutes * 60);
+  ROOM_CHECK = diff.roomCheck;
+  CHANCES = diff.chances;
+  warden.diff = diff.warden;
+  for (const b of document.querySelectorAll('.diff-btn')) b.classList.toggle('on', b.dataset.diff === diff.id);
+  document.getElementById('diff-blurb').textContent = diff.blurb;
+}
+for (const b of document.querySelectorAll('.diff-btn')) b.addEventListener('click', () => applyDifficulty(b.dataset.diff));
+applyDifficulty(store.get('diff', 'normal'));
+
 let introDone = false;
 document.getElementById('start').addEventListener('click', async () => {
   sfx.startAudio();
@@ -253,7 +273,11 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { muted = !muted; sfx.setMuted(muted); }
 });
 document.getElementById('caught').addEventListener('click', () => { if (caughtReady) backToRoom(); });
-canvas.addEventListener('mousedown', (e) => { if (e.button === 0 && state === 'playing' && input.locked) throwSelected(); });
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || state !== 'playing') return;
+  if (brawl) punch();                      // fighting: left mouse button
+  else if (input.locked) throwSelected();
+});
 addEventListener('wheel', (e) => {
   if (state !== 'playing' || !jug.inv.length) return;
   jug.sel = (jug.sel + (e.deltaY > 0 ? 1 : -1) + jug.inv.length) % jug.inv.length;
@@ -278,6 +302,10 @@ function tooLate() {
 
 // What should you be doing right now? Shown under the clock.
 function objective() {
+  if (brawl) {
+    if (player.inRoom) return `Kamre mein ho! ${Math.ceil(CALM_TIME - brawl.calm)} second aur... bahar mat niklo.`;
+    return `JHAGDA! Room 106 tak pahuncho. Raaste mein koi aaye toh MAARO (${isTouch ? 'MAARO button' : 'left click'}). Warden Saab se bacho: bheed ke peeche chhupo!`;
+  }
   if (map.doors.get(MY_DOOR).locked) return 'Kamre se niklo. Chaabi bahar taale mein hai. Almirah, bistar, table: talaashi lo!';
   const grill = map.doors.get('25,6'), gate = map.doors.get('32,13'), lobbyWindow = map.doors.get('27,13');
   const behindHim = 'Kuch nahi bacha? Ek hi raasta: Warden Saab gate kholein, tab unke peeche-peeche nikal jao.';
@@ -345,15 +373,18 @@ function getCaught() {
   jug.seated = null;
   sfx.setTension(0);
   const lostMaggi = loseMaggi(jug);
-  const taken = confiscateAll(jug);
+  setTimeout(() => { koByBrawl = false; }, 0);
+  const taken = diff.confiscate === 'all' ? confiscateAll(jug) : [confiscateHeld(jug)].filter(Boolean);
   if (taken.length) stripped = true;
   warden.alert = 0; alertChip.hidden = true;     // he knows exactly where you are now
-  document.getElementById('caught-line').textContent = lostMaggi
+  document.getElementById('caught-line').textContent = koByBrawl
+    ? '"Jhagde mein dher pade the! Uthao isko, kamre mein daalo!"'
+    : lostMaggi
     ? '"Ye Maggi? Ye toh main khaunga. CONFISCATED!"'
     : `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
   const lines = [];
   if (lostMaggi) lines.push('🍜 Maggi gayi! Phir se order karna padega.');
-  if (taken.length) lines.push(`${taken.map((id) => ITEMS[id].icon).join(' ')} Saara saaman confiscate! (Uski almirah mein...)`);
+  if (taken.length) lines.push(`${taken.map((id) => ITEMS[id].icon).join(' ')} ${diff.confiscate === 'all' ? 'Saara saaman' : 'Haath ka saaman'} confiscate! (Uski almirah mein...)`);
   const stuck = (!jug.solved.grill || map.doors.get('25,6').locked) && !canOpen(jug, 'grill');
   if (taken.length && stuck) lines.push('Ab ek hi raasta: Warden Saab ke peeche-peeche nikalna, jab woh gate kholein.');
   document.getElementById('caught-taken').innerHTML = lines.map((l) => `<span></span>`).join('<br>');
@@ -459,9 +490,13 @@ async function win() {
   state = 'won';
   const left = Math.max(0, Math.floor(CLOSING - orderedAt));
   if (left > 0) jug.log.push({ text: `Band hone se ${left} minute pehle order diya`, kind: 'time', points: left * 4 });
-  const s = score(jug, caughtCount);
-  const best = store.get('best', 0);
-  if (s.total > best) store.set('best', s.total);
+  let s = score(jug, caughtCount);
+  if (diff.scoreMult !== 1) {
+    jug.log.push({ text: `${diff.icon} ${diff.label} ×${diff.scoreMult}`, kind: diff.scoreMult > 1 ? 'improvised' : 'caught', points: Math.round(s.total * (diff.scoreMult - 1)) });
+    s = score(jug, caughtCount);
+  }
+  const best = store.get(`best-${diff.id}`, 0);
+  if (s.total > best) store.set(`best-${diff.id}`, s.total);
   document.getElementById('score-best').textContent = s.total > best
     ? (best ? `NAYA RECORD! Pichhla best: ${best}` : 'Pehla record ban gaya!')
     : `Tumhara best: ${best}`;
@@ -541,11 +576,8 @@ function powerChanged(e) {
     sfx.tubeTinks();
     sfx.cheer();
     students.show(true);
-    if (e.first) {
-      hud.bigPop('BIJLI AA GAYI!');
-      hud.subtitle('Bijli wapas! Sab padhne baith gaye... aur ab Warden Saab ko sab dikhta hai. Study circle mein chhupo, ya... bijli phir se udaao?', 6);
-      hud.say('Bijli aa gayi! Chalo sab, PADHAI KARO!', wardenHead, 'alert');
-    } else {
+    if (e.first) startBrawl();
+    else {
       hud.say('Ho gaya theek. Ab koi haath mat lagana!', wardenHead, 'alert');
     }
   } else {
@@ -556,6 +588,78 @@ function powerChanged(e) {
     hud.subtitle('Fuse ud gaya! Andhera wapas. Warden Saab MCB theek karne gaye...', 4);
     hud.say('Abey! Fuse kisne udaaya?!', wardenHead, 'angry');
     sendWarden(warden, FUSE_BOX.x, FUSE_BOX.z, 7, 'fuse');
+  }
+}
+
+// ---- the brawl after the lights come on
+const brawlerModels = createBrawlers(scene, 10);
+const brawlerHead = (id) => () => brawlerModels.headOf(id);
+let brawl = null, punchCd = 0, shakeT = 0, brawlSayT = 0, koByBrawl = false;
+const POW = ['POW!', 'DHISHOOM!', 'THAPPAD!', 'BAM!', 'DHAP!'];
+function startBrawl() {
+  brawl = createBrawl(diff.brawl);
+  brawl.caughtOutside = !inMyRoom(player.x, player.z);
+  brawlerModels.show(true);
+  // They come bursting out of the wing: the grill is flung open.
+  for (const d of map.doors.values()) if (d.kind === 'G') { d.open = true; d.locked = false; d.byWarden = false; }
+  hud.bigPop('DHISHOOM!');
+  hud.subtitle(`Bijli aate hi HOSTEL MEIN JHAGDA! Room 106 tak pahuncho aur 10 second kamre mein raho. Raaste mein koi aaye toh MAARO (${isTouch ? 'MAARO button' : 'left click'}). Warden Saab se bacho!`, 7);
+  sendWarden(warden, 31, 8.5, 9999, 'brawl');
+  hud.say('YE KYA HO RAHA HAI?! SAB APNE KAMRE MEIN!', wardenHead, 'angry');
+  buzz([60, 40, 60, 40, 60]);
+}
+function endBrawl() {
+  brawlerModels.show(false);
+  if (brawl.caughtOutside) jug.log.push({ text: 'Hostel ke jhagde se bach ke kamre tak', kind: 'sneaky', points: 200 });
+  if (brawl.kos) jug.log.push({ text: `Jhagde mein ${brawl.kos} ko dhoya`, kind: 'distraction', points: 25 * brawl.kos });
+  brawl = null;
+  player.cover = 0;
+  if (warden.mode === 'errand' && warden.errand?.tag === 'brawl') resumePatrol(warden);
+  hud.bigPop('SHAANTI!');
+  hud.subtitle('Sab shaant. Ab sab padhai kar rahe hain... aur bijli hai, toh Warden Saab door se dekhte hain. Study circle mein chhupo, ya fuse udaao.', 6);
+  sfx.sting('got');
+}
+// He plants himself in the lobby and glares around, yelling.
+function wardenAtBrawl(dt) {
+  if (warden.mode !== 'errand' || warden.errand?.tag !== 'brawl' || warden.moving) return;
+  warden.yaw = -0.3 + Math.sin(time * 0.8) * 1.3;
+  brawlSayT -= dt;
+  if (brawlSayT <= 0) {
+    brawlSayT = 5 + Math.random() * 3;
+    hud.say(['SAB APNE KAMRE MEIN!', 'Kisne shuru kiya ye?!', 'Ek-ek ka naam likh raha hoon!', 'Bijli aate hi tamasha?!'][Math.floor(Math.random() * 4)], wardenHead, 'angry');
+  }
+}
+function brawlEvent(e) {
+  if (e.type === 'windup') hud.sfx('!', brawlerModels.headOf(e.id), 0.9, 0.5);
+  else if (e.type === 'hit') {
+    const n = moveCircle(map, player.x, player.z, e.kx, e.kz, RADIUS);
+    player.x = n.x; player.z = n.z;
+    shakeT = 0.3;
+    hud.hurt();
+    hud.sfx(POW[Math.floor(Math.random() * POW.length)], v3(player.x - Math.sin(player.yaw) * 0.8, 1.4, player.z - Math.cos(player.yaw) * 0.8), 1.2, 0.6);
+    sfx.punch(true);
+    buzz(50);
+  } else if (e.type === 'whiff') sfx.whoosh();
+  else if (e.type === 'flail') {
+    if (Math.hypot(e.x - player.x, e.z - player.z) < 9) hud.sfx(POW[Math.floor(Math.random() * POW.length)], v3(e.x, 1.6, e.z), 0.7, 0.6);
+  } else if (e.type === 'shout') {
+    if (Math.hypot(e.x - player.x, e.z - player.z) < 10) hud.say(e.line, brawlerHead(e.id), 'angry', 'Student');
+  } else if (e.type === 'playerKO') {
+    koByBrawl = true;
+    brawl.hp = PLAYER_HP * 0.6;
+    getCaught();
+  }
+}
+function punch() {
+  if (punchCd > 0 || !brawl) return;
+  punchCd = 0.45;
+  const heavy = selected(jug) === 'bat';
+  vm.play(heavy ? 'smashHit' : 'punch', heavy ? 0.35 : 0.25, heavy ? { item: 'bat' } : { item: null });
+  for (const e of playerPunch(brawl, player, heavy)) {
+    if (e.type === 'miss') { sfx.whoosh(); continue; }
+    hud.sfx(e.type === 'ko' ? 'K.O.!' : POW[Math.floor(Math.random() * POW.length)], v3(e.x, 1.5, e.z), e.type === 'ko' ? 1.4 : 1, 0.7);
+    sfx.punch(false);
+    if (e.type === 'ko') { buzz(40); hud.toast('💫 Ek dher!'); }
   }
 }
 
@@ -609,6 +713,7 @@ function inventoryKeys() {
     }
   }
   if (input.tapped('KeyV')) throwSelected();
+  if (input.tapped('Punch')) punch();      // the MAARO button on phones
 }
 
 // ---- E: look, act, hold
@@ -688,17 +793,18 @@ function playerInDoor(door) {
 
 // ---- phone niceties: only the buttons that do something, a glowing USE, buzzes
 const tb = (k) => document.querySelector(`#tbtns [data-key="${k}"]`);
-const TB = isTouch ? { use: tb('KeyE'), torch: tb('KeyF'), throw: tb('KeyV'), combine: tb('KeyG'), drop: tb('KeyQ') } : null;
+const TB = isTouch ? { use: tb('KeyE'), torch: tb('KeyF'), throw: tb('KeyV'), combine: tb('KeyG'), drop: tb('KeyQ'), punch: tb('Punch') } : null;
 let tbKey = '';
 function updateTouchButtons(canUse) {
   if (!TB) return;
   const sel = selected(jug);
   const r = recipeFor(jug);
-  const k = [jug.inv.includes('phone'), sel && ITEMS[sel].props.includes('throw'), r && r.ready, !!sel, canUse].join();
+  const k = [jug.inv.includes('phone'), sel && ITEMS[sel].props.includes('throw'), r && r.ready, !!sel, canUse, !!brawl].join();
   if (k !== tbKey) {
     tbKey = k;
     TB.torch.hidden = !jug.inv.includes('phone');
     TB.throw.hidden = !(sel && ITEMS[sel].props.includes('throw'));
+    TB.punch.hidden = !brawl;
     TB.combine.hidden = !(r && r.ready);
     TB.drop.hidden = !sel;
     TB.use.classList.toggle('ready', canUse);
@@ -824,6 +930,7 @@ function frame() {
 function tick(dt) {
   time += dt;
   resize();
+  punchCd = Math.max(0, punchCd - dt);
 
   if (state === 'playing') {
     const torchWas = player.torch;
@@ -869,9 +976,20 @@ function tick(dt) {
     if (state !== 'playing') { input.endFrame(); return; }   // the last bite just won the game
     updateTouchButtons(canUseNow);
 
+    // The brawl: fists flying, hide in the crowd, ten quiet seconds in your room.
+    if (brawl) {
+      player.cover = crowdCover(brawl, warden.x, warden.z, player.x, player.z);
+      for (const e of updateBrawl(brawl, dt, player, map)) brawlEvent(e);
+      if (state !== 'playing') { input.endFrame(); return; }
+      wardenAtBrawl(dt);
+      if (tickCalm(brawl, dt, player)) endBrawl();
+    } else player.cover = 0;
+
     // Slipping through the grill while he holds it open.
     const grill = map.doors.get('25,6');
-    if (prevX < 25 && prevX > 24 && player.x >= 25 && player.z > 6 && player.z < 8 && grill.locked) tailgated(jug);
+    if (prevX < 25 && prevX > 24 && player.x >= 25 && player.z > 6 && player.z < 8) {
+      if (grill.locked) tailgated(jug); else if (!jug.solved.grill) crossedOpenGrill(jug);
+    }
     prevX = player.x;
     // ...and through the main gate the same way.
     const gate = map.doors.get('32,13');
@@ -882,7 +1000,7 @@ function tick(dt) {
     prevZ = player.z;
 
     // His checks on Room 106. Out of bed when he looks in? He starts hunting you.
-    if (!map.doors.get(MY_DOOR).locked && !tutorial.active) {
+    if (!map.doors.get(MY_DOOR).locked && !tutorial.active && !brawl) {
       if (!checksStarted && !player.inRoom) { checksStarted = true; roomCheckT = ROOM_CHECK.first; }
       if (checksStarted) {
         roomCheckT -= dt;
@@ -898,7 +1016,8 @@ function tick(dt) {
       }
     }
 
-    if (jug.solved.grill && jug.act === 1) handle(startAct2(jug), noises);
+    // The lights come back when you cross the grill, or at 2:00 AM regardless.
+    if (jug.act === 1 && (jug.solved.grill || minutes >= BRAWL_AT)) handle(startAct2(jug), noises);
     handle(updateJugaad(jug, dt, { player, warden }), noises);
     chowkidarHears(jug, noises);
 
@@ -974,7 +1093,9 @@ function tick(dt) {
 
   // camera
   const bob = player.moving ? Math.sin(player.bob) * (player.running ? 0.05 : 0.025) : 0;
-  camera.position.set(player.x, player.eye + bob, player.z);
+  shakeT = Math.max(0, shakeT - dt);
+  const sh = shakeT * 0.12;
+  camera.position.set(player.x + (Math.random() - 0.5) * sh, player.eye + bob + (Math.random() - 0.5) * sh, player.z + (Math.random() - 0.5) * sh);
   camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
   if (window.__debugCam) {           // dev only: look from anywhere
     camera.position.set(...window.__debugCam.pos);
@@ -997,6 +1118,9 @@ function tick(dt) {
   world.update(dt);
   hud.setMeter(warden.meter, warden.mode);
   hud.setChances(CHANCES - caughtCount, CHANCES);
+  brawlerModels.update(dt, brawl);
+  hud.setDum(brawl ? brawl.hp / PLAYER_HP : null);
+  hud.setCalm(brawl && player.inRoom ? Math.max(0, CALM_TIME - brawl.calm) : null);
   hud.setStatus({ minutes, areaName: areaName(player.x, player.z), torch: player.torch, crouch: player.crouch, running: player.running });
   hud.setInventory(jug, recipeFor(jug));
   hud.setHold(hold ? hold.t / hold.action.hold : 0);
@@ -1015,4 +1139,5 @@ window.__game = {
   // Advance the game by `seconds` without waiting for frames (for testing).
   step(seconds) { for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60); },
   get minutes() { return minutes; }, set minutes(m) { minutes = m; },
-  get roomCheckT() { return roomCheckT; }, set roomCheckT(v) { roomCheckT = v; }, get state() { return state; }, set state(s) { state = s; } };
+  get roomCheckT() { return roomCheckT; }, set roomCheckT(v) { roomCheckT = v; },
+  get brawl() { return brawl; }, get state() { return state; }, set state(s) { state = s; } };

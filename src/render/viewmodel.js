@@ -51,6 +51,8 @@ const POSES = {
     return [0.04 - 0.1 * e, 0.12 - 0.05 * e, 0.12 - 0.42 * e, 0.8 - 1.6 * e, 0, 0];
   },
   drop: (k) => [0, -0.3 * ease(k), 0, -0.4 * k, 0, 0],
+  // a quick jab straight out
+  punch: (k) => { const e = k < 0.35 ? ease(k / 0.35) : 1 - ease((k - 0.35) / 0.65); return [-0.12 * e, 0.08 * e, -0.3 * e, 0.15 * e, -0.2 * e, 0]; },
   // bowl up under your chin, slurping
   eat: (k, t) => [-0.13, 0.11 + Math.sin(t * 9) * 0.015, 0.06, 0.55 + Math.sin(t * 9) * 0.08, -0.3, Math.sin(t * 4.5) * 0.05],
   equip: (k) => [0, -0.3 * (1 - ease(k)), 0, -0.6 * (1 - ease(k)), 0, 0],

@@ -406,3 +406,36 @@ body.touch #tut-step { font-size: 13px; }
 #alert-chip { background: var(--red); color: var(--paper); animation: shake .4s infinite; }
 #alert-chip[hidden] { display: none; }
 #caught-taken span { display: inline-block; }
+
+/* ---------- difficulty picker ---------- */
+.diff-pick { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
+.diff-btn {
+  font-family: var(--comic); font-size: 17px; letter-spacing: 1px; cursor: pointer;
+  background: var(--paper); color: var(--ink); border: 3px solid var(--ink); border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--ink); padding: 4px 12px; opacity: .65;
+}
+.diff-btn.on { background: var(--yellow); opacity: 1; transform: translate(-1px, -2px); box-shadow: 4px 5px 0 var(--ink); }
+.diff-btn[data-diff="hard"].on { background: var(--red); color: var(--paper); }
+.diff-blurb { font-size: 14px; font-weight: 700; margin: 0 0 12px; min-height: 18px; }
+
+/* ---------- brawl HUD ---------- */
+#dum { position: absolute; left: calc(16px + env(safe-area-inset-left)); bottom: 96px; display: flex; align-items: center; gap: 8px; opacity: 0; transition: opacity .2s; }
+#dum.show { opacity: 1; }
+#dum span { font-family: var(--comic); font-size: 22px; letter-spacing: 1px; color: var(--yellow); text-shadow: 2px 2px 0 var(--ink); }
+#dum-bar { width: 200px; height: 16px; background: rgba(0, 0, 0, .6); border: 3px solid var(--ink); outline: 2px solid var(--paper); border-radius: 8px; overflow: hidden; }
+#dum-fill { height: 100%; width: 100%; background: #3fbf5a; transition: width .15s; }
+#dum.low #dum-fill { background: var(--red); }
+#dum.low span { animation: shake .3s infinite; color: var(--red); }
+#calm {
+  position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
+  font-family: var(--comic); font-size: 54px; letter-spacing: 2px; color: var(--paper);
+  -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink); opacity: 0;
+}
+#calm.show { opacity: 1; }
+#hurt { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 45%, rgba(224, 68, 44, .65)); opacity: 0; }
+#hurt.go { animation: hurt .45s ease-out; }
+@keyframes hurt { from { opacity: 1; } to { opacity: 0; } }
+.tb.punch { background: var(--red); color: var(--paper); }
+body.touch #dum { bottom: 150px; }
+body.touch #dum-bar { width: 130px; }
+body.touch #calm { font-size: 34px; }
