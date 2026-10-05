@@ -113,7 +113,7 @@ step back to dodge), keep an eye on your DUM bar (zero and you're carted off: a 
 stay out of Warden Saab's sight: he plants himself in the lobby yelling and glaring around,
 and a brawler between you and him hides you. Once in your room, stay put for **ten seconds**
 while it all calms down (step out and the count restarts). Then the studious ones (who never
-stopped cramming) are in their study circles, the lights are on, and Darkness no longer
+stopped cramming) are in their study circles, the lights are on, and darkness no longer
 hides you; Warden Saab puts his torch away and sees anything in front of him. Two answers:
 
 - **Hide in plain sight:** borrow a book from a study circle and sit down to cram. He walks
