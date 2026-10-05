@@ -2,10 +2,10 @@
 // Warden Saab, the jugaad rules and the screen.
 import * as THREE from 'three';
 import { createMap, WARDEN_START, WARDEN_ROUTE, OUTSIDE_ROUTE, inMyRoom, areaName } from '../shared/map.js';
-import { createWarden, updateWarden, resumePatrol, sendWarden } from '../shared/warden-ai.js';
+import { createWarden, updateWarden, resumePatrol, sendWarden, isBehind } from '../shared/warden-ai.js';
 import {
   ITEMS, MY_DOOR, SMELL_R, loseMaggi, createJugaad, actionsFor, perform, lockedHint, combine, recipeFor,
-  selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateHeld, tailgated, score,
+  selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateAll, canOpen, tailgated, tailgatedMain, score,
   startAct2, restorePower, STUDY_CIRCLES, FUSE_BOX,
 } from '../shared/jugaad.js';
 import { createStudents } from './render/students.js';
@@ -26,7 +26,8 @@ import { createHud, showOverlay } from './hud.js';
 import * as sfx from './audio.js';
 
 const START_MINUTES = 90;            // 1:30 AM
-const MINUTES_PER_SECOND = 1 / 10;   // game clock: 1:30 to 3:00 AM is 15 real minutes
+const MINUTES_PER_SECOND = 1 / 8;    // game clock: 1:30 to 3:00 AM is 12 real minutes to order
+const ROOM_CHECK = { first: 70, calm: 85, hunting: 60 };   // seconds between his checks on Room 106
 const CLOSING = 180;
 const CHANCES = 5;                   // caught this many times: Papa ko phone, detention                 // 3:00 AM: Bhaiya pulls the shutter down
 const CAUGHT_LINES = [
@@ -168,6 +169,7 @@ let wasSeated = false;
 let warned15 = false;
 let canUseNow = false;
 let smellT = 0, chaiT = 0, torchAway = false, orderedAt = START_MINUTES;
+let prevZ = player.z, roomCheckT = 0, checksStarted = false, stripped = false;
 
 let sizeW = 0, sizeH = 0;
 function resize() {
@@ -277,10 +279,23 @@ function tooLate() {
 // What should you be doing right now? Shown under the clock.
 function objective() {
   if (map.doors.get(MY_DOOR).locked) return 'Kamre se niklo. Chaabi bahar taale mein hai. Almirah, bistar, table: talaashi lo!';
-  if (!jug.solved.grill) return 'A-wing ka grill gate paar karo. Lock pick (bobby pin + compass), cricket bat, ya Warden Saab ke peeche-peeche.';
+  const grill = map.doors.get('25,6'), gate = map.doors.get('32,13'), lobbyWindow = map.doors.get('27,13');
+  const behindHim = 'Kuch nahi bacha? Ek hi raasta: Warden Saab gate kholein, tab unke peeche-peeche nikal jao.';
+  if (!jug.solved.grill) {
+    if (!canOpen(jug, 'grill') && stripped) return behindHim;
+    return 'A-wing ka grill gate paar karo. Lock pick (bobby pin + compass), cricket bat, Warden Saab ki chaabi, ya unke peeche-peeche.';
+  }
   if (!jug.solved.main) {
-    if (jug.power.on) return 'Bijli wapas! Study circle mein chhupo, ya kettle + press + heater se fuse udaao. Phir: chowkidar ki chaabi.';
-    return 'Main gate ki chaabi soye chowkidar ki belt pe hai. Ya lobby ki dheeli khidki...';
+    if (jug.power.on) return 'Bijli wapas! Ab Warden Saab door se dekh lete hain. Study circle mein chhupo, ya kettle + press + heater se fuse udaao. Phir: main gate ki chaabi.';
+    return 'Main gate ki chaabi: soye chowkidar ki belt pe, Warden Saab ki table mein, ya unki jeb mein (peeche se!). Ya lobby ki dheeli khidki...';
+  }
+  // He locks gates again: tell you when you are on the wrong side of one.
+  const inWing = player.x < 25 && player.z < 13, outside = player.z > 13;
+  if (inWing && grill.locked && !grill.open && jug.maggi.state !== 'carried') {
+    return canOpen(jug, 'grill') ? 'Grill phir se band kar diya! Dobara kholo.' : behindHim;
+  }
+  if (outside && gate.locked && !gate.open && !lobbyWindow.open && jug.maggi.state === 'carried') {
+    return canOpen(jug, 'main') ? 'Main gate phir band! Chaabi se kholo.' : behindHim;
   }
   const m = jug.maggi;
   if (m.state === 'none') return 'Bahar niklo! Bhaiya ki Maggi Point pe order do (counter pe E).';
@@ -299,6 +314,26 @@ function switchRoute() {
   if (warden.mode === 'patrol') resumePatrol(warden);
 }
 
+// Hunting: he knows you are out. Faster, sees further, checks more often.
+const alertChip = document.getElementById('alert-chip');
+function startHunt(line) {
+  if (warden.alert) return;
+  warden.alert = 1;
+  alertChip.hidden = false;
+  hud.say(line, wardenHead, 'angry');
+  hud.bigPop('WARDEN ALERT!');
+  hud.subtitle('Warden Saab ab tumhe dhoondh rahe hain: tez chalte hain, door tak aur jaldi dekhte hain. Agli check pe kamre mein mile toh shaant ho jayenge.', 6);
+  sfx.sting('chase');
+  buzz([80, 60, 80]);
+}
+function calmDown(line) {
+  if (line) hud.say(line, wardenHead, 'calm');
+  if (!warden.alert) return;
+  warden.alert = 0;
+  alertChip.hidden = true;
+  hud.toast('😮‍💨 Warden Saab shaant ho gaye.');
+}
+
 function getCaught() {
   caughtCount++;
   if (caughtCount >= CHANCES) { detention(); return; }
@@ -310,13 +345,19 @@ function getCaught() {
   jug.seated = null;
   sfx.setTension(0);
   const lostMaggi = loseMaggi(jug);
-  const taken = lostMaggi ? null : confiscateHeld(jug);
+  const taken = confiscateAll(jug);
+  if (taken.length) stripped = true;
+  warden.alert = 0; alertChip.hidden = true;     // he knows exactly where you are now
   document.getElementById('caught-line').textContent = lostMaggi
     ? '"Ye Maggi? Ye toh main khaunga. CONFISCATED!"'
     : `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
-  document.getElementById('caught-taken').textContent = lostMaggi
-    ? '🍜 Maggi gayi! Phir se order karna padega.'
-    : taken ? `${ITEMS[taken].icon} ${ITEMS[taken].name} confiscate! (Uski almirah mein gaya...)` : '';
+  const lines = [];
+  if (lostMaggi) lines.push('🍜 Maggi gayi! Phir se order karna padega.');
+  if (taken.length) lines.push(`${taken.map((id) => ITEMS[id].icon).join(' ')} Saara saaman confiscate! (Uski almirah mein...)`);
+  const stuck = (!jug.solved.grill || map.doors.get('25,6').locked) && !canOpen(jug, 'grill');
+  if (taken.length && stuck) lines.push('Ab ek hi raasta: Warden Saab ke peeche-peeche nikalna, jab woh gate kholein.');
+  document.getElementById('caught-taken').innerHTML = lines.map((l) => `<span></span>`).join('<br>');
+  [...document.querySelectorAll('#caught-taken span')].forEach((el, i) => { el.textContent = lines[i]; });
   const left = CHANCES - caughtCount;
   document.getElementById('caught-count').innerHTML = `<span class="bowls">${'🍜'.repeat(left)}<i>${'🍜'.repeat(caughtCount)}</i></span> Chances bache: <b>${left}</b>`;
   document.getElementById('caught-warn').textContent = left === 1 ? 'Ek aur baar... aur PAPA KO PHONE!' : '';
@@ -403,6 +444,7 @@ function backToRoom() {
   warden.x = WARDEN_ROUTE[0].x; warden.z = WARDEN_ROUTE[0].z;
   warden.route = routeFor();
   resumePatrol(warden);
+  roomCheckT = ROOM_CHECK.calm;
   hud.clearBubbles();
   startPlaying();
 }
@@ -574,7 +616,10 @@ function interact(dt, noises) {
   let target = jug.seated
     ? { type: 'circle', circle: jug.seated, dist: 0.5, at: jug.seated.seat, key: `circle:${jug.seated.id}` }
     : findTarget(player, jug);
-  let actions = target ? actionsFor(jug, target, { dist: target.dist, inside: target.inside, crouch: player.crouch }) : [];
+  // Right behind Warden Saab, with his keys on his belt: try his pocket.
+  const behind = jug.wardenKeys && warden.mode !== 'chase' && isBehind(warden, player, 1.4);
+  if (behind && !jug.seated) target = { type: 'warden', dist: 1, at: { x: warden.x, z: warden.z }, key: 'warden' };
+  let actions = target ? actionsFor(jug, target, { dist: target.dist, inside: target.inside, crouch: player.crouch, behind }) : [];
   // Back in your room with the Maggi: E eats it (unless you are at the door, to shut it first).
   if (jug.inv.includes('maggi') && inMyRoom(player.x, player.z) && !(target && target.type === 'door' && actions.length)) {
     target = { type: 'eat', dist: 0, at: { x: player.x, z: player.z }, key: 'eat' };
@@ -617,6 +662,11 @@ function interact(dt, noises) {
       if (eating) sfx.slurp();
     }
     if (action.id === 'grabKeys') grabTick(jug, dt, player.crouch);
+    // Standing up behind him? He feels it.
+    if (action.id === 'pickpocket' && !player.crouch) {
+      warden.meter = Math.min(1, warden.meter + dt * 1.2);
+      if (!hold.warned) { hold.warned = true; hud.say('Ae?! Kaun hai peeche?!', wardenHead, 'alert'); }
+    }
     if (hold.t >= action.hold) {
       holdLatch = true;
       hold = null;
@@ -793,6 +843,8 @@ function tick(dt) {
     }
     // The stall's lantern lights you up; indoors the tube lights do (when the power is on).
     player.lit = Math.hypot(player.x - 36, player.z - 18.2) < 3.3;
+    player.inRoom = inMyRoom(player.x, player.z);
+    player.hasMaggi = carrying;
     warden.lightsOn = jug.power.on && warden.z < 13.2 && player.z < 13.2;
     if (warden.lightsOn !== torchAway) { torchAway = warden.lightsOn; wardenModel.setTorch(!torchAway); }
     if (jug.seated) {
@@ -821,6 +873,30 @@ function tick(dt) {
     const grill = map.doors.get('25,6');
     if (prevX < 25 && prevX > 24 && player.x >= 25 && player.z > 6 && player.z < 8 && grill.locked) tailgated(jug);
     prevX = player.x;
+    // ...and through the main gate the same way.
+    const gate = map.doors.get('32,13');
+    if (prevZ < 13 && player.z >= 13.6 && player.x > 31 && player.x < 34 && gate.locked && gate.open) {
+      tailgatedMain(jug);
+      hud.toast('🤫 Warden Saab ke peeche-peeche main gate se!');
+    }
+    prevZ = player.z;
+
+    // His checks on Room 106. Out of bed when he looks in? He starts hunting you.
+    if (!map.doors.get(MY_DOOR).locked && !tutorial.active) {
+      if (!checksStarted && !player.inRoom) { checksStarted = true; roomCheckT = ROOM_CHECK.first; }
+      if (checksStarted) {
+        roomCheckT -= dt;
+        if (roomCheckT <= 0) {
+          if ((warden.mode === 'patrol' || warden.mode === 'search') && sendWarden(warden, 2.5, 9.6, 2, 'roomcheck')) {
+            roomCheckT = warden.alert ? ROOM_CHECK.hunting : ROOM_CHECK.calm;
+            if (!player.inRoom) {
+              hud.toast('🚨 Warden Saab Room 106 check karne nikle! Wapas pahuncho?');
+              hud.say('Zara dekhun, Room 106 wala so raha hai ya nahi...', wardenHead, 'alert');
+            }
+          } else roomCheckT = 5;
+        }
+      }
+    }
 
     if (jug.solved.grill && jug.act === 1) handle(startAct2(jug), noises);
     handle(updateJugaad(jug, dt, { player, warden }), noises);
@@ -840,6 +916,11 @@ function tick(dt) {
         else { sfx.gateClang(ear.dist, ear.pan); hud.sfx(e.closed ? 'KHATAK!' : 'KHAT-KHAT!', pos, 1); }
       } else if (e.type === 'errandDone' && e.tag === 'fuse') {
         handle(restorePower(jug), noises);
+      } else if (e.type === 'errandDone' && e.tag === 'roomcheck') {
+        if (player.inRoom) calmDown('Achha, so raha hai. Shabash. Subah paper hai!');
+        else startHunt('Room 106 KHAALI?! Kahan gaya ye?! Dhoondo usse!');
+      } else if (e.type === 'errandDone' && e.tag === 'closeDoor' && e.door === map.doors.get(MY_DOOR) && !player.inRoom) {
+        startHunt('Room 106 ka darwaza khula... aur kamra khaali?! DHOONDO!');
       } else if (e.type === 'caught') {
         getCaught();
       }
@@ -910,6 +991,7 @@ function tick(dt) {
   applyPower(world.power);
   world.setPlugged(jug.plugged.length);
   wardenModel.update(warden, dt);
+  wardenModel.setKeys(jug.wardenKeys);
   chowModel.update(jug.chowkidar, dt);
   worldItems.update(dt, jug.worldItems, time);
   world.update(dt);
@@ -932,4 +1014,5 @@ window.__game = {
   map, jug, player, warden, scene, camera, renderer,
   // Advance the game by `seconds` without waiting for frames (for testing).
   step(seconds) { for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60); },
-  get minutes() { return minutes; }, set minutes(m) { minutes = m; }, get state() { return state; }, set state(s) { state = s; } };
+  get minutes() { return minutes; }, set minutes(m) { minutes = m; },
+  get roomCheckT() { return roomCheckT; }, set roomCheckT(v) { roomCheckT = v; }, get state() { return state; }, set state(s) { state = s; } };

@@ -17,7 +17,8 @@ export const ITEMS = {
   glass:     { name: 'Steel glass', icon: '🥛', props: ['throw'], hint: 'Click / V: phenko. TANNNG!', throwNoise: 10, sfx: 'TANNNG!' },
   ball:      { name: 'Tennis ball', icon: '🎾', props: ['throw'], hint: 'Click / V: phenko.', throwNoise: 6, sfx: 'TUP! TUP!' },
   roomkey:   { name: 'Room 106 ki chaabi', icon: '🔑', props: ['key106'], hint: 'Apne hi kamre ki chaabi.' },
-  gatekey:   { name: 'Main gate ki chaabi', icon: '🗝️', props: ['keyMain'], hint: 'Chowkidar ki chaabi. Main gate ka taala.' },
+  gatekey:   { name: 'Main gate ki chaabi', icon: '🗝️', props: ['keyMain'], hint: 'Main gate ka taala khulta hai. Sambhaal ke rakho, Warden Saab gate phir band kar dete hain.' },
+  masterkey: { name: 'Warden Saab ka key-bunch', icon: '🔑', props: ['keyMain', 'keyGrill'], hint: 'Grill gate aur main gate, dono khulte hain. Pakde gaye toh wapas le lenge.' },
   book:      { name: 'Udhaar ki kitaab', icon: '📖', props: ['book'], hint: 'Study circle mein baith ke ratta maaro. Warden khush.' },
   kettle:    { name: 'Electric kettle', icon: '🫖', props: ['appliance'], hint: 'Bahut current kheenchti hai...' },
   iron:      { name: 'Press (iron)', icon: '👔', props: ['appliance'], hint: 'Kisi ki shirt press karne waala tha.' },
@@ -53,7 +54,7 @@ export const LOOT = {
   '26,12': ['ball'],              // Lobby
   '30,3': ['kettle'],             // Common room: carrom table
   '40,12': ['iron'],              // Lobby almirah
-  '38,3': ['heater'],             // Warden's desk
+  '38,3': ['heater', 'gatekey'],  // Warden's desk: his heater, and a spare main gate key
 };
 
 const EMPTY_LINES = [
@@ -141,6 +142,7 @@ export function createJugaad(map) {
     plugged: [],                // appliances in the extension board
     seated: null,               // the study circle you are pretending in
     maggi: { state: 'none', t: 0 },   // none -> cooking -> ready -> carried -> eaten
+    wardenKeys: true,           // his key bunch is on his belt (until you pick his pocket)
     circleByCell: new Map(),
   };
 }
@@ -238,6 +240,8 @@ export function actionsFor(st, target, ctx = {}) {
     else if (m.state === 'ready') A.push({ id: 'takeMaggi', label: 'Maggi utha lo', hold: 0.6 });
   } else if (target.type === 'eat') {
     if (has(st, 'maggi')) A.push({ id: 'eat', label: 'Chupke se Maggi khao', hold: EAT_TIME, noise: 4.5, uses: 'maggi' });
+  } else if (target.type === 'warden') {
+    if (st.wardenKeys && ctx.behind) A.push({ id: 'pickpocket', label: 'Peeche se... Warden Saab ki chaabi nikalo', hold: 2 });
   } else if (target.type === 'chowkidar') {
     const ch = st.chowkidar;
     if (ch.awake || !ch.hasKeys) return A;
@@ -259,6 +263,7 @@ export function actionsFor(st, target, ctx = {}) {
       }
     } else if (d.kind === 'G') {
       if (!d.locked) return A;
+      if (it('keyGrill')) A.push({ id: 'unlockGrill', label: 'Taala kholo (Warden Saab ki chaabi)', hold: 1.2, noise: 2, uses: it('keyGrill') });
       if (it('pick')) A.push({ id: 'pickGrill', label: `Taala kholo (${name(it('pick'))})`, hold: 4, noise: 3, uses: it('pick') });
       if (it('heavy')) A.push({ id: 'smashGrill', label: `Taala tod do (${name(it('heavy'))}) — bahut shor!`, hold: 1.2, uses: it('heavy') });
     } else if (d.kind === 'M') {
@@ -324,6 +329,7 @@ export function perform(st, target, action, ctx = {}) {
       const got = [];
       while (c.items.length && st.inv.length < INV_CAP) { const id = c.items.shift(); st.inv.push(id); got.push(id); }
       if (got.length) ev.push({ type: 'got', items: got });
+      if (got.includes('gatekey') && !st.gateKeyHow) st.gateKeyHow = 'key';     // the spare from his desk
       if (c.items.length) msg('Jeb bhar gayi! Kuch girao (Q) phir aao.');
       break;
     }
@@ -397,6 +403,7 @@ export function perform(st, target, action, ctx = {}) {
     }
     case 'smashGrill': {
       openGroup('G');
+      for (const d of map.doors.values()) if (d.kind === 'G') d.broken = true;   // he can shut it, not lock it
       solve(st, 'grill', 'brute', 'Grill gate ka taala bat se tod diya');
       noise(18, 'DHADAAM!!', 1.4);
       break;
@@ -416,6 +423,19 @@ export function perform(st, target, action, ctx = {}) {
       if (!addItem(st, 'gatekey')) dropItem(st, 'gatekey', ch.x - 0.8, ch.z - 0.4);
       ev.push({ type: 'got', items: ['gatekey'] });
       msg(action.id === 'hookKeys' ? 'Lambi kundi se chaabi utaar li. Chowkidar ko pata bhi nahi chala!' : 'Chaabi nikal li! Saans mat lena...');
+      break;
+    }
+    case 'unlockGrill': {
+      openGroup('G');
+      solve(st, 'grill', 'sneaky', 'Warden Saab ki jeb se chaabi, grill pe');
+      noise(2, 'KLIK!', 0.9);
+      break;
+    }
+    case 'pickpocket': {
+      st.wardenKeys = false;
+      if (!addItem(st, 'masterkey')) dropItem(st, 'masterkey', ctx.px ?? 0, ctx.pz ?? 0);
+      ev.push({ type: 'got', items: ['masterkey'] });
+      msg('Chaabi ka guchha nikal liya! Saans mat lena...');
       break;
     }
     case 'borrowBook': {
@@ -470,9 +490,13 @@ export function perform(st, target, action, ctx = {}) {
     }
     case 'unlockMain': {
       openGroup('M');
-      removeItem(st, 'gatekey');
-      solve(st, 'main', st.gateKeyHow || 'key',
-        st.gateKeyHow === 'improvised' ? 'Lambi kundi se chowkidar ki chaabi' : 'Sote chowkidar ki belt se chaabi');
+      // You keep the key: he locks the gate again whenever he finds it open.
+      if (action.uses === 'masterkey') solve(st, 'main', 'sneaky', 'Warden Saab ki jeb se chaabi, main gate pe');
+      else {
+        const how = st.gateKeyHow || 'key';
+        solve(st, 'main', how, how === 'improvised' ? 'Lambi kundi se chowkidar ki chaabi'
+          : how === 'sneaky' ? 'Sote chowkidar ki belt se chaabi' : "Warden Saab ki table se spare chaabi");
+      }
       noise(4, 'KHATAK!', 1);
       break;
     }
@@ -509,6 +533,31 @@ export function restorePower(st) {
   st.plugged.forEach((id, i) => dropItem(st, id, BOARD.x - 0.4 - i * 0.35, BOARD.z - 0.6));
   st.plugged = [];
   return [{ type: 'power', on: true }];
+}
+
+// Caught: he takes every tool you have (the phone stays; his own keys go back on
+// his belt). Everything else lands in his almirah. Returns the list taken.
+export function confiscateAll(st) {
+  const taken = st.inv.filter((id) => id !== 'phone' && id !== 'maggi');
+  for (const id of taken) {
+    removeItem(st, id);
+    if (id === 'masterkey') st.wardenKeys = true;
+    else st.containers.get(WARDEN_ALMIRAH).items.push(id);
+  }
+  st.sel = 0;
+  return taken;
+}
+
+// Do you have anything that gets you through the locks still ahead?
+export function canOpen(st, which) {
+  if (which === 'grill') return has(st, 'pick') || has(st, 'heavy') || has(st, 'keyGrill');
+  if (which === 'main') return has(st, 'keyMain') || has(st, 'heavy') || has(st, 'longhook');
+  return true;
+}
+
+// Slipped out through the main gate while he had it open.
+export function tailgatedMain(st) {
+  solve(st, 'main', 'sneaky', 'Warden Saab ke peeche-peeche main gate se nikal gaye');
 }
 
 // Slipped through the grill gate while Warden Saab had it open.

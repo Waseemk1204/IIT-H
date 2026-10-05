@@ -16,7 +16,7 @@ export const ACTION_ANIM = {
   slidePaper: 'slide', pokeKey: 'poke', pullPaper: 'pull', unlock106: 'twist', vent: 'reachUp',
   pickGrill: 'pick', smashGrill: 'swing', smashWindow: 'swing', hookKeys: 'hook', grabKeys: 'grab',
   unlockMain: 'twist', borrowBook: 'grab', plug: 'push',
-  order: 'press', takeMaggi: 'grab', eat: 'eat',
+  order: 'press', takeMaggi: 'grab', eat: 'eat', pickpocket: 'grab', unlockGrill: 'twist',
 };
 
 const ease = (k) => k * k * (3 - 2 * k);

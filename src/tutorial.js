@@ -58,8 +58,9 @@ export function createTutorial({ isTouch }) {
       done: (c, s) => (c.player.crouch && s.t > 1) || s.t > 8,
     },
     {
-      text: () => "Warden Saab ki torch ki roshni mein mat aana. Upar ka <b>meter</b> bhare toh chhupo: band darwaza, andhera, ya jhuk ke furniture ke peeche.",
-      done: (c, s) => s.t > 8,
+      text: () => "Warden Saab ki torch ki roshni mein mat aana. Upar ka <b>meter</b> bhare toh chhupo."
+        + '<small>Woh beech beech mein Room 106 check karte hain. Kamra khaali mila toh tumhe dhoondhne nikalte hain, aur tez! Khule darwaze band karte hain, gate phir se lock. Pakde gaye toh saara saaman le lete hain.</small>',
+      done: (c, s) => s.t > 11,
     },
     {
       text: () => 'Aage kya karna hai, upar <b>KAAM</b> line hamesha batayegi. Maggi ke liye... kuch bhi! 🍜',

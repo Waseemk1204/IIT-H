@@ -64,13 +64,26 @@ with at least two ways through (the tests check every one):
 | Lock | Ways through |
 |---|---|
 | Your room (roommate locked it from outside) | newspaper under the door + poke the key out + pull it in · hanger through the ventilator |
-| Wing grill gate | jugaad lock pick · slip through behind Warden Saab · smash it with a cricket bat (very loud) |
-| Main gate (chowkidar asleep with the keys) | hook the keys off with the lambi kundi · grab them crouching · break the loose lobby window with a bat |
+| Wing grill gate | jugaad lock pick · Warden Saab's own key bunch · slip through behind him · smash it with a cricket bat (very loud) |
+| Main gate | the sleeping chowkidar's keys (hook them off with the lambi kundi, or grab them crouching) · the spare key in Warden Saab's desk · his own key bunch (pick his pocket from behind, crouched) · slip out behind him · break the loose lobby window with a bat |
 
 Distractions: throw a steel glass or tennis ball, leave your phone with an alarm (he
 confiscates it if he finds it), switch on the common-room radio, or knock on a sleeping
 student's door. The sleeping chowkidar wakes to loud noise and shouts for the warden. Get
-caught and whatever you are holding goes into the warden's almirah (you can steal it back).
+caught and he takes **every tool you have** into his almirah (you can steal them back); with
+nothing left, the only way through a gate is behind his back when he opens it.
+
+**Warden Saab doesn't make it easy:**
+- He shuts every door he finds open, and locks the grill and the main gate again (a lock you
+  smashed can't be relocked). Keys you use, you keep.
+- Every minute or so he checks on Room 106. A toast warns you he's on his way. In bed: all
+  good. Room empty: he **hunts** you, about 35% faster, seeing further and wider, spotting
+  you quicker, wandering in no fixed order and checking more often, until a check finds you
+  back in bed (or he catches you).
+- With the tube lights on he sees about 22 m down a corridor, about 80 degrees either side,
+  and fills the meter in about a second at 10 m.
+- In your own room you're where you should be: he leaves you alone, unless you're holding
+  the Maggi.
 You get **five chances**: the HUD shows five bowls of Maggi, and each catch takes one. The
 fifth time, Warden Saab rings your parents ("KYAAA?! Exam se pehle?!") and the night ends
 in detention, writing "Lights off = SONA" until 6 AM while he eats your Maggi.
@@ -101,8 +114,8 @@ crowd, the fuse blowing, and a dhol-and-tabla loop that gets busier when he is s
 and frantic when he is chasing you.
 
 **Phase 4 (done):** touch controls and a landscape-only phone layout; a KAAM line under the
-clock that always says what to do next; the 3 AM deadline (the stall closes; 15 real
-minutes, with a warning at 2:45); a time bonus and a saved best score on the score card;
+clock that always says what to do next; the 3 AM deadline (order before the stall closes:
+12 real minutes, with a warning at 2:45, for a 10-15 minute game); a time bonus and a saved best score on the score card;
 a pause menu with sensitivity, controls and restart; an icon and web manifest.
 
 ## How it is built
@@ -146,3 +159,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | Five chances with a HUD counter and last-chance warning; the parents-call and detention comic ending. |
 | 3 Oct 2026 | Claude Code (Anthropic) | New win: order at the stall, hide while the warden patrols outside, carry the Maggi back (smell, no running), eat it in Room 106; new ending comic. |
 | 3 Oct 2026 | Claude Code (Anthropic) | First-room tutorial with step cards, a 3D pointer arrow, clock freeze, skip and replay. |
+| 5 Oct 2026 | Claude Code (Anthropic) | Difficulty pass: sharper lights-on sight, Room 106 checks and hunt mode, the warden shuts and relocks doors and gates, master key and desk key, confiscate-all on catch, 12-minute clock, tests. |

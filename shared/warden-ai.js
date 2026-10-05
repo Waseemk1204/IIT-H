@@ -1,16 +1,24 @@
 // Warden Saab: patrols with a torch, sees what his torch (or yours) lights
-// up, and comes to look when he hears something. Pure logic: the renderer
-// reads his state, and the tests drive it directly.
+// up, comes to look when he hears something, shuts every door he finds open,
+// and once he knows you are out of your room he hunts you: faster, sharper.
+// Pure logic: the renderer reads his state, and the tests drive it directly.
 import { findPath, lineOfSight, doorAt, walkableForWarden } from './map.js';
 
 export const SPEED = { patrol: 1.25, investigate: 1.7, chase: 2.7 };
 export const BEAM_HALF_ANGLE = 0.3;   // radians, matches the visible cone
 export const BEAM_RANGE = 11;
 export const CATCH_DIST = 0.9;
+export const LIT_RANGE = 22;          // with the tube lights on he sees down the whole corridor
+export const LIT_FOV = 1.4;           // half-angle, radians (~80 degrees each side)
 const TURN_RATE = 3.2;                // radians per second
 const SUSPICIOUS_AT = 0.25;
 const CHASE_AT = 0.6;
 const DECAY = 0.18;                   // meter drain per second unseen
+const DOOR_SEE = 8;                   // how far away he notices an open door
+
+// Hunting (alert = 1): everything a notch sharper.
+export const HUNT = { speed: 1.35, range: 1.3, fov: 1.3, rate: 1.4, hear: 1.3, decay: 0.6, wait: 0.4 };
+const k = (w, key) => (w.alert ? HUNT[key] : 1);
 
 // Angle a - b wrapped to [-PI, PI].
 export function angleDiff(a, b) {
@@ -29,7 +37,8 @@ export function createWarden(map, start, route) {
     lookOffset: 0,         // torch sweep while standing
     mode: 'patrol',        // patrol | suspicious | investigate | search | chase | errand
     lightsOn: false,       // power back: he sees without his torch
-    errand: null,          // { x, z, wait, tag }
+    alert: 0,              // 1 = hunting you (your room was empty)
+    errand: null,          // { x, z, wait, tag, door? }
     route, wp: 0,
     path: null, pathI: 0,
     wait: 0, waitLook: null,
@@ -38,6 +47,7 @@ export function createWarden(map, start, route) {
     lastSeen: null,
     unseenFor: 0,
     searchT: 0,
+    doorScanT: 0,
     t: 0,
     moving: false,
     map,
@@ -55,35 +65,46 @@ export function resumePatrol(w) {
   w.path = null; w.wait = 0; w.target = null; w.lastSeen = null;
 }
 
+// Is the player close behind his back (for picking his pocket)?
+export function isBehind(w, p, reach = 1.5) {
+  const dx = p.x - w.x, dz = p.z - w.z;
+  const d = Math.hypot(dx, dz);
+  return d < reach && Math.abs(angleDiff(yawTo(dx, dz), w.yaw)) > 2.2;
+}
+
 // How fast the player fills the meter this instant (0 = not seen).
 export function sightRate(w, p, map) {
   const dx = p.x - w.x, dz = p.z - w.z;
   const dist = Math.hypot(dx, dz);
-  if (dist > 15) return 0;
+  const lit = w.lightsOn || p.lit;
+  if (dist > (lit ? LIT_RANGE : 15) * k(w, 'range')) return 0;
   const torchYaw = w.yaw + w.lookOffset;
   const off = Math.abs(angleDiff(yawTo(dx, dz), torchYaw));
   const bodyOff = Math.abs(angleDiff(yawTo(dx, dz), w.yaw));
+  // In your own room you are where you should be (unless there's Maggi in your hands).
+  if (p.inRoom && !p.hasMaggi) return 0;
   // Sitting in a study circle with a book: just another student cramming.
   if (p.hidden && w.mode !== 'chase' && dist > 1.2) return 0;
   if (!lineOfSight(map, w.x, w.z, p.x, p.z, { targetCrouched: p.crouch })) return 0;
   let rate = 0;
-  if (w.lightsOn || p.lit) {
+  if (lit) {
     // Tube lights on (or you are standing in the stall's lantern light):
-    // no shadows to hide in. He sees anything in front of him.
-    if (bodyOff < 1.2) rate = 0.3 + 1.3 * Math.max(0, 1 - dist / 15) ** 1.5;
-    else if (dist < 2.2 && bodyOff < 1.6) rate = 0.9;
-    if (p.crouch) rate *= 0.7;
-    return rate;
+    // no shadows to hide in. He sees far, wide and fast.
+    const R = LIT_RANGE * k(w, 'range');
+    if (bodyOff < LIT_FOV * k(w, 'fov')) rate = 0.35 + 1.4 * Math.max(0, 1 - dist / R) ** 1.3;
+    else if (dist < 2.5 && bodyOff < 1.9) rate = 0.9;
+    if (p.crouch) rate *= 0.75;
+    return rate * k(w, 'rate');
   }
-  if (off < BEAM_HALF_ANGLE + 0.04 && dist < BEAM_RANGE) {
-    rate = 0.25 + 1.4 * (1 - dist / 12) ** 2;                // caught in his beam: fast up close
-  } else if (p.torch && bodyOff < 1.45) {
-    rate = 0.2 + 0.8 * (1 - dist / 16);                      // your torch gives you away
-  } else if (dist < 2.2 && bodyOff < 1.1) {
-    rate = 0.9;                                               // right under his nose
+  if (off < BEAM_HALF_ANGLE + 0.04 && dist < BEAM_RANGE * k(w, 'range')) {
+    rate = 0.25 + 1.4 * Math.max(0, 1 - dist / (12 * k(w, 'range'))) ** 2;   // caught in his beam
+  } else if (p.torch && bodyOff < 1.45 * k(w, 'fov')) {
+    rate = 0.2 + 0.8 * Math.max(0, 1 - dist / 16);                            // your torch gives you away
+  } else if (dist < 2.2 * k(w, 'range') && bodyOff < 1.1 * k(w, 'fov')) {
+    rate = 0.9;                                                               // right under his nose
   }
   if (p.crouch && !p.torch) rate *= 0.6;
-  return rate;
+  return rate * k(w, 'rate');
 }
 
 // The closest cell he can actually stand in (noises come from beds, chairs...).
@@ -117,13 +138,13 @@ function followPath(w, dt, speed, events) {
   const tgt = w.path[w.pathI];
   const dx = tgt.x - w.x, dz = tgt.z - w.z;
   const d = Math.hypot(dx, dz);
-  const step = speed * dt;
+  const step = speed * k(w, 'speed') * dt;
   turnToward(w, yawTo(dx, dz), dt);
-  // Open any door that is in the way.
+  // Open any door that is in the way (and remember to shut it behind him).
   const door = doorAt(w.map, Math.floor(tgt.x), Math.floor(tgt.z));
   if (door && !door.open && d < 1.3) {
     door.open = true;
-    door.byWarden = door.locked;
+    door.byWarden = true;
     events.push({ type: 'door', door, by: 'warden' });
   }
   if (d <= step) {
@@ -141,7 +162,7 @@ function turnToward(w, yaw, dt) {
   w.yaw += Math.abs(d) <= m ? d : Math.sign(d) * m;
 }
 
-// Gates he walked through close behind him (he has the key; you don't).
+// Doors he walked through close behind him. A locked one stays locked.
 function closeGatesBehind(w, events) {
   for (const door of w.map.doors.values()) {
     if (!door.byWarden || !door.open) continue;
@@ -153,7 +174,45 @@ function closeGatesBehind(w, events) {
   }
 }
 
-// Send him somewhere to do something (fix the fuse). Seeing you still interrupts.
+// Where to stand to shut a door, on whichever side he is.
+function approachFor(w, door) {
+  if (door.kind === 'G') return { x: w.x < door.x + 0.5 ? door.x - 0.6 : door.x + 1.6, z: door.z + 0.5 };
+  if (door.kind === 'M') return { x: door.x + 0.5, z: w.z < door.z + 0.5 ? door.z - 0.6 : door.z + 1.6 };
+  return { x: door.x + 0.5, z: door.z < 6 ? door.z + 1.4 : door.z - 0.4 };   // room doors: corridor side
+}
+
+// Every so often: is there a door standing open that shouldn't be?
+function scanForOpenDoors(w, player, events) {
+  for (const door of w.map.doors.values()) {
+    if (!door.open || door.byWarden || door.kind === 'W' || (door.ignoreUntil || 0) > w.t) continue;
+    // He notices the open doorway from where he'd stand to shut it.
+    const a = approachFor(w, door);
+    const dx = a.x - w.x, dz = a.z - w.z;
+    const d = Math.hypot(dx, dz);
+    if (d > DOOR_SEE * k(w, 'range')) continue;
+    if (d > 0.6 && Math.abs(angleDiff(yawTo(dx, dz), w.yaw)) > 1.3 * k(w, 'fov')) continue;
+    if (!lineOfSight(w.map, w.x, w.z, a.x, a.z)) continue;
+    if (!sendWarden(w, a.x, a.z, 0.6, 'closeDoor')) { door.ignoreUntil = w.t + 15; continue; }
+    w.errand.door = door;
+    events.push({ type: 'say', line: door.kind === 'D' ? 'Ye darwaza khula kyun hai?!' : 'Gate kisne khola?!', mood: 'alert' });
+    return;
+  }
+}
+
+// Shut it, and lock it if it's a gate whose lock still works.
+function shutDoor(w, door, player, events) {
+  const group = door.kind === 'D' ? [door] : [...w.map.doors.values()].filter((d) => d.kind === door.kind);
+  // Not on top of you: he would just see you instead.
+  if (group.some((d) => Math.hypot(player.x - (d.x + 0.5), player.z - (d.z + 0.5)) < 0.9)) return;
+  for (const d of group) {
+    d.open = false; d.byWarden = false;
+    if (d.kind !== 'D' && !d.broken) d.locked = true;
+  }
+  events.push({ type: 'door', door, by: 'warden', closed: true, shut: true });
+}
+
+// Send him somewhere to do something (fix the fuse, check your room).
+// Seeing you still interrupts.
 export function sendWarden(w, x, z, wait, tag) {
   w.mode = 'errand';
   w.errand = { x, z, wait, tag };
@@ -161,7 +220,7 @@ export function sendWarden(w, x, z, wait, tag) {
   return true;
 }
 
-// One tick. `player` = { x, z, crouch, torch }, `noises` = [{ x, z, r }].
+// One tick. `player` = { x, z, crouch, torch }, `noises` = [{ x, z, r, line? }].
 export function updateWarden(w, dt, player, noises = []) {
   const events = [];
   w.t += dt;
@@ -174,7 +233,7 @@ export function updateWarden(w, dt, player, noises = []) {
     w.unseenFor = 0;
   } else {
     w.unseenFor += dt;
-    w.meter = Math.max(0, w.meter - DECAY * dt);
+    w.meter = Math.max(0, w.meter - DECAY * k(w, 'decay') * dt);
   }
 
   const dist = Math.hypot(player.x - w.x, player.z - w.z);
@@ -196,7 +255,8 @@ export function updateWarden(w, dt, player, noises = []) {
   if (w.mode !== 'chase' && w.mode !== 'suspicious' && w.mode !== 'errand') {
     for (const n of noises) {
       const nd = Math.hypot(n.x - w.x, n.z - w.z);
-      const heard = lineOfSight(w.map, w.x, w.z, n.x, n.z) ? n.r : n.r * 0.55;
+      const r = n.r * k(w, 'hear');
+      const heard = lineOfSight(w.map, w.x, w.z, n.x, n.z) ? r : r * 0.55;
       if (nd < heard) {
         const fresh = w.mode !== 'investigate';
         const moved = !w.target || Math.hypot(w.target.x - n.x, w.target.z - n.z) > 1;
@@ -212,21 +272,32 @@ export function updateWarden(w, dt, player, noises = []) {
     }
   }
 
+  // Open doors bother him.
+  if (w.mode === 'patrol' || w.mode === 'search') {
+    w.doorScanT -= dt;
+    if (w.doorScanT <= 0) { w.doorScanT = 0.4; scanForOpenDoors(w, player, events); }
+  }
+
   switch (w.mode) {
     case 'patrol': {
       w.lookOffset *= 0.9;
       if (!w.path) {
         const p = w.route[w.wp];
         if (!setPath(w, p.x, p.z)) { w.wp = (w.wp + 1) % w.route.length; break; }
-        w.wait = p.wait;
+        w.wait = p.wait * k(w, 'wait');
       }
       if (followPath(w, dt, SPEED.patrol, events)) {
         const p = w.route[w.wp];
         turnToward(w, p.look, dt);
-        w.lookOffset = Math.sin(w.t * 1.1) * 0.55;       // sweeps his torch
+        w.lookOffset = Math.sin(w.t * (w.alert ? 2.2 : 1.1)) * 0.55;   // sweeps his torch
         w.wait -= dt;
         if (w.wait <= 0) {
-          w.wp = (w.wp + 1) % w.route.length;
+          // Hunting, he stops following the usual round: any stop, any order.
+          if (w.alert && w.route.length > 2) {
+            let n = w.wp;
+            while (n === w.wp) n = Math.floor(Math.random() * w.route.length);
+            w.wp = n;
+          } else w.wp = (w.wp + 1) % w.route.length;
           w.path = null;
         }
       }
@@ -270,10 +341,12 @@ export function updateWarden(w, dt, player, noises = []) {
     case 'errand': {
       const e = w.errand;
       if (followPath(w, dt, SPEED.investigate, events)) {
-        w.lookOffset = Math.sin(w.t * 3) * 0.3;
+        if (e.door) turnToward(w, yawTo(e.door.x + 0.5 - w.x, e.door.z + 0.5 - w.z), dt);
+        else w.lookOffset = Math.sin(w.t * 3) * 0.3;
         e.wait -= dt;
         if (e.wait <= 0) {
-          events.push({ type: 'errandDone', tag: e.tag });
+          if (e.tag === 'closeDoor' && e.door) shutDoor(w, e.door, player, events);
+          events.push({ type: 'errandDone', tag: e.tag, door: e.door });
           resumePatrol(w);
         }
       }
@@ -283,9 +356,9 @@ export function updateWarden(w, dt, player, noises = []) {
       w.moving = false;
       w.searchT += dt;
       w.lookOffset = 0;
-      w.yaw += dt * 1.4 * Math.sign(Math.sin(w.searchT * 0.8) + 0.01);
-      if (w.searchT > 5) {
-        events.push({ type: 'say', line: 'Hmph. Chooha hoga.', mood: 'calm' });
+      w.yaw += dt * 1.4 * k(w, 'speed') * Math.sign(Math.sin(w.searchT * 0.8) + 0.01);
+      if (w.searchT > (w.alert ? 3 : 5)) {
+        events.push({ type: 'say', line: w.alert ? 'Yahin kahin hai... dhoondta hoon.' : 'Hmph. Chooha hoga.', mood: 'calm' });
         resumePatrol(w);
       }
       break;

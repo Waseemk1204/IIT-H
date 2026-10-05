@@ -403,3 +403,6 @@ body.tutoring #objective { display: none; }
 body.touch #tutorial { top: 60px; width: min(420px, 56vw); left: 40%; padding: 6px 10px 8px; }
 body.touch #tut-text { font-size: 13px; }
 body.touch #tut-step { font-size: 13px; }
+#alert-chip { background: var(--red); color: var(--paper); animation: shake .4s infinite; }
+#alert-chip[hidden] { display: none; }
+#caught-taken span { display: inline-block; }

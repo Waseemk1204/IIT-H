@@ -65,6 +65,17 @@ export function createWardenModel({ shadowSize = 1024, torchLight = true } = {})
   const pocketL = inkBox(0.12, 0.12, 0.02, 0xa38a55, -0.13, 1.33, 0.27, 0.008);
   const pocketR = pocketL.clone(); pocketR.position.x = 0.13;
   body.add(torso, belly, belt, pocketL, pocketR);
+  // His key bunch, hanging off the back of his belt (pickpocket-able).
+  const keys = new THREE.Group();
+  const ring = inkMesh(new THREE.TorusGeometry(0.045, 0.01, 6, 14), 0xd8b23a, 0.006);
+  keys.add(ring);
+  for (let i = 0; i < 4; i++) {
+    const k = inkBox(0.018, 0.075, 0.01, i % 2 ? 0x8a8f94 : 0xd8b23a, -0.03 + i * 0.02, -0.11, 0, 0.004);
+    k.rotation.z = (i - 1.5) * 0.25;
+    keys.add(k);
+  }
+  keys.position.set(0.18, 0.84, -0.3);
+  body.add(keys);
 
   // head
   const head = new THREE.Group();
@@ -145,6 +156,7 @@ export function createWardenModel({ shadowSize = 1024, torchLight = true } = {})
     beam,
     head,
     setMood(m) { mood = m; moodT = 2.5; },
+    setKeys(v) { keys.visible = v; },
     // With the tube lights on he puts his torch away.
     setTorch(on) {
       spot.intensity = on ? 90 : 0;
