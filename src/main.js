@@ -4,14 +4,12 @@ import * as THREE from 'three';
 import { createMap, WARDEN_START, WARDEN_ROUTE, OUTSIDE_ROUTE, inMyRoom, areaName, moveCircle } from '../shared/map.js';
 import { createWarden, updateWarden, resumePatrol, sendWarden, isBehind } from '../shared/warden-ai.js';
 import {
-  ITEMS, MY_DOOR, SMELL_R, loseMaggi, createJugaad, actionsFor, perform, lockedHint, combine, recipeFor,
-  selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateAll, confiscateHeld, canOpen, tailgated, tailgatedMain, crossedOpenGrill, score,
+  ITEMS, MY_DOOR, createJugaad, actionsFor, perform, lockedHint, combine, recipeFor,
+  selected, dropItem, setAlarm, updateJugaad, chowkidarHears, grabTick, confiscateAll, confiscateHeld, canOpen, tailgated, tailgatedMain, score,
   startAct2, restorePower, STUDY_CIRCLES, FUSE_BOX,
 } from '../shared/jugaad.js';
 import { createStudents } from './render/students.js';
-import { createBrawlers } from './render/brawlers.js';
 import { getDifficulty, DIFFICULTY } from '../shared/difficulty.js';
-import { createBrawl, updateBrawl, playerPunch, tickCalm, crowdCover, CALM_TIME, PLAYER_HP } from '../shared/brawl.js';
 import { playComic } from './cutscenes.js';
 import { createTutorial } from './tutorial.js';
 import { buildWorld } from './render/world.js';
@@ -30,7 +28,6 @@ import * as sfx from './audio.js';
 
 const START_MINUTES = 90;            // 1:30 AM
 const CLOSING = 180;                 // 3:00 AM: Bhaiya pulls the shutter down
-const BRAWL_AT = 120;                // 2:00 AM: the lights come back (and the brawl starts) no matter where you are
 // Set from the difficulty picked on the title screen (see shared/difficulty.js).
 let diff = getDifficulty('normal');
 let MINUTES_PER_SECOND = 90 / (diff.clockMinutes * 60);   // 1:30 to 3:00 AM in real minutes
@@ -128,11 +125,6 @@ readyBowl.scale.setScalar(1.8);
 readyBowl.position.set(37.3, 0.96, 18.3);
 readyBowl.visible = false;
 scene.add(readyBowl);
-const plate = makeItemModel('maggi');
-plate.scale.setScalar(1.5);
-plate.position.set(1.55, 0.76, 9.45);
-plate.visible = false;
-scene.add(plate);
 
 // The tutorial and its bouncing arrow.
 const tutorial = createTutorial({ isTouch });
@@ -174,7 +166,7 @@ let prevX = player.x;
 let wasSeated = false;
 let warned15 = false;
 let canUseNow = false;
-let smellT = 0, chaiT = 0, torchAway = false, orderedAt = START_MINUTES;
+let chaiT = 0, torchAway = false, orderedAt = START_MINUTES;
 let prevZ = player.z, roomCheckT = 0, checksStarted = false, stripped = false;
 
 let sizeW = 0, sizeH = 0;
@@ -273,11 +265,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { muted = !muted; sfx.setMuted(muted); }
 });
 document.getElementById('caught').addEventListener('click', () => { if (caughtReady) backToRoom(); });
-canvas.addEventListener('mousedown', (e) => {
-  if (e.button !== 0 || state !== 'playing') return;
-  if (brawl) punch();                      // fighting: left mouse button
-  else if (input.locked) throwSelected();
-});
+canvas.addEventListener('mousedown', (e) => { if (e.button === 0 && state === 'playing' && input.locked) throwSelected(); });
 addEventListener('wheel', (e) => {
   if (state !== 'playing' || !jug.inv.length) return;
   jug.sel = (jug.sel + (e.deltaY > 0 ? 1 : -1) + jug.inv.length) % jug.inv.length;
@@ -302,10 +290,6 @@ function tooLate() {
 
 // What should you be doing right now? Shown under the clock.
 function objective() {
-  if (brawl) {
-    if (player.inRoom) return `Kamre mein ho! ${Math.ceil(CALM_TIME - brawl.calm)} second aur... bahar mat niklo.`;
-    return `JHAGDA! Room 106 tak pahuncho. Raaste mein koi aaye toh MAARO (${isTouch ? 'MAARO button' : 'left click'}). Warden Saab se bacho: bheed ke peeche chhupo!`;
-  }
   if (map.doors.get(MY_DOOR).locked) return 'Kamre se niklo. Chaabi bahar taale mein hai. Almirah, bistar, table: talaashi lo!';
   const grill = map.doors.get('25,6'), gate = map.doors.get('32,13'), lobbyWindow = map.doors.get('27,13');
   const behindHim = 'Kuch nahi bacha? Ek hi raasta: Warden Saab gate kholein, tab unke peeche-peeche nikal jao.';
@@ -318,19 +302,18 @@ function objective() {
     return 'Main gate ki chaabi: soye chowkidar ki belt pe, Warden Saab ki table mein, ya unki jeb mein (peeche se!). Ya lobby ki dheeli khidki...';
   }
   // He locks gates again: tell you when you are on the wrong side of one.
-  const inWing = player.x < 25 && player.z < 13, outside = player.z > 13;
-  if (inWing && grill.locked && !grill.open && jug.maggi.state !== 'carried') {
+  const inWing = player.x < 25 && player.z < 13, outside = player.z > 13.5;
+  if (inWing && grill.locked && !grill.open) {
     return canOpen(jug, 'grill') ? 'Grill phir se band kar diya! Dobara kholo.' : behindHim;
   }
-  if (outside && gate.locked && !gate.open && !lobbyWindow.open && jug.maggi.state === 'carried') {
-    return canOpen(jug, 'main') ? 'Main gate phir band! Chaabi se kholo.' : behindHim;
+  if (!outside && gate.locked && !gate.open && !lobbyWindow.open && jug.maggi.state === 'none') {
+    return canOpen(jug, 'main') ? 'Main gate phir band kar diya! Chaabi se kholo.' : behindHim;
   }
   const m = jug.maggi;
   if (m.state === 'none') return 'Bahar niklo! Bhaiya ki Maggi Point pe order do (counter pe E).';
   if (m.state === 'cooking') return `Maggi ban rahi hai (${Math.ceil(m.t)}s). Warden Saab bahar ghoom rahe hain: andhere mein chhupo, lantern ke paas mat ruko!`;
-  if (m.state === 'ready') return 'MAGGI READY! Counter se utha lo.';
-  if (inMyRoom(player.x, player.z)) return 'Darwaza band karo, phir chupke se khao (E dabaye rakho). Slurp ki awaaz aati hai!';
-  return 'Maggi lekar Room 106 wapas jao. Bhaago mat (garam hai!). Paas aaye toh Warden Saab ko khushboo aa jayegi...';
+  if (m.state === 'ready') return 'MAGGI READY! Counter pe jao.';
+  return 'Maggi ke liye... kuch bhi!';
 }
 
 // While your Maggi cooks (or waits on the counter) he does his rounds outside.
@@ -372,18 +355,11 @@ function getCaught() {
   buzz([120, 60, 220]);
   jug.seated = null;
   sfx.setTension(0);
-  const lostMaggi = loseMaggi(jug);
-  setTimeout(() => { koByBrawl = false; }, 0);
   const taken = diff.confiscate === 'all' ? confiscateAll(jug) : [confiscateHeld(jug)].filter(Boolean);
   if (taken.length) stripped = true;
   warden.alert = 0; alertChip.hidden = true;     // he knows exactly where you are now
-  document.getElementById('caught-line').textContent = koByBrawl
-    ? '"Jhagde mein dher pade the! Uthao isko, kamre mein daalo!"'
-    : lostMaggi
-    ? '"Ye Maggi? Ye toh main khaunga. CONFISCATED!"'
-    : `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
+  document.getElementById('caught-line').textContent = `"${CAUGHT_LINES[(caughtCount - 1) % CAUGHT_LINES.length]}"`;
   const lines = [];
-  if (lostMaggi) lines.push('🍜 Maggi gayi! Phir se order karna padega.');
   if (taken.length) lines.push(`${taken.map((id) => ITEMS[id].icon).join(' ')} ${diff.confiscate === 'all' ? 'Saara saaman' : 'Haath ka saaman'} confiscate! (Uski almirah mein...)`);
   const stuck = (!jug.solved.grill || map.doors.get('25,6').locked) && !canOpen(jug, 'grill');
   if (taken.length && stuck) lines.push('Ab ek hi raasta: Warden Saab ke peeche-peeche nikalna, jab woh gate kholein.');
@@ -486,7 +462,7 @@ async function win() {
   jug.seated = null;
   document.exitPointerLock?.();
   sfx.setTension(0);
-  if (!window.__skipComics) await playComic(roomPanels(), { title: 'Room 106, raat ke 3 baje...' });
+  if (!window.__skipComics) await playComic(endingPanels(), { title: 'Maggi Point, raat ke 2 baje ke baad...' });
   state = 'won';
   const left = Math.max(0, Math.floor(CLOSING - orderedAt));
   if (left > 0) jug.log.push({ text: `Band hone se ${left} minute pehle order diya`, kind: 'time', points: left * 4 });
@@ -512,7 +488,7 @@ async function win() {
   document.getElementById('score-total').textContent = s.total;
   document.getElementById('score-title').textContent = s.title;
   const h = Math.floor(minutes / 60), m = Math.floor(minutes % 60);
-  document.getElementById('score-time').textContent = `Maggi khatam: ${h}:${String(m).padStart(2, '0')} AM. Warden Saab ko pata bhi nahi chala.`;
+  document.getElementById('score-time').textContent = `Maggi Point pe Maggi mili: ${h}:${String(m).padStart(2, '0')} AM.`;
   sfx.sting('alert');
   showOverlay('won');
 }
@@ -557,9 +533,6 @@ function handle(events, noises) {
       hud.toast('🍜 Maggi ready! Counter pe rakhi hai.');
       buzz([40, 40, 40]);
       switchRoute();
-    } else if (e.type === 'carrying') {
-      hud.subtitle('Ab Room 106! Bhaago mat, garam hai. Aur khushboo... door se aati hai.', 5);
-      switchRoute();
     } else if (e.type === 'won') {
       win();
     }
@@ -576,8 +549,11 @@ function powerChanged(e) {
     sfx.tubeTinks();
     sfx.cheer();
     students.show(true);
-    if (e.first) startBrawl();
-    else {
+    if (e.first) {
+      hud.bigPop('BIJLI AA GAYI!');
+      hud.subtitle('Bijli wapas! Sab padhne baith gaye... aur ab Warden Saab ko sab dikhta hai. Study circle mein chhupo, ya... bijli phir se udaao?', 6);
+      hud.say('Bijli aa gayi! Chalo sab, PADHAI KARO!', wardenHead, 'alert');
+    } else {
       hud.say('Ho gaya theek. Ab koi haath mat lagana!', wardenHead, 'alert');
     }
   } else {
@@ -588,78 +564,6 @@ function powerChanged(e) {
     hud.subtitle('Fuse ud gaya! Andhera wapas. Warden Saab MCB theek karne gaye...', 4);
     hud.say('Abey! Fuse kisne udaaya?!', wardenHead, 'angry');
     sendWarden(warden, FUSE_BOX.x, FUSE_BOX.z, 7, 'fuse');
-  }
-}
-
-// ---- the brawl after the lights come on
-const brawlerModels = createBrawlers(scene, 10);
-const brawlerHead = (id) => () => brawlerModels.headOf(id);
-let brawl = null, punchCd = 0, shakeT = 0, brawlSayT = 0, koByBrawl = false;
-const POW = ['POW!', 'DHISHOOM!', 'THAPPAD!', 'BAM!', 'DHAP!'];
-function startBrawl() {
-  brawl = createBrawl(diff.brawl);
-  brawl.caughtOutside = !inMyRoom(player.x, player.z);
-  brawlerModels.show(true);
-  // They come bursting out of the wing: the grill is flung open.
-  for (const d of map.doors.values()) if (d.kind === 'G') { d.open = true; d.locked = false; d.byWarden = false; }
-  hud.bigPop('DHISHOOM!');
-  hud.subtitle(`Bijli aate hi HOSTEL MEIN JHAGDA! Room 106 tak pahuncho aur 10 second kamre mein raho. Raaste mein koi aaye toh MAARO (${isTouch ? 'MAARO button' : 'left click'}). Warden Saab se bacho!`, 7);
-  sendWarden(warden, 31, 8.5, 9999, 'brawl');
-  hud.say('YE KYA HO RAHA HAI?! SAB APNE KAMRE MEIN!', wardenHead, 'angry');
-  buzz([60, 40, 60, 40, 60]);
-}
-function endBrawl() {
-  brawlerModels.show(false);
-  if (brawl.caughtOutside) jug.log.push({ text: 'Hostel ke jhagde se bach ke kamre tak', kind: 'sneaky', points: 200 });
-  if (brawl.kos) jug.log.push({ text: `Jhagde mein ${brawl.kos} ko dhoya`, kind: 'distraction', points: 25 * brawl.kos });
-  brawl = null;
-  player.cover = 0;
-  if (warden.mode === 'errand' && warden.errand?.tag === 'brawl') resumePatrol(warden);
-  hud.bigPop('SHAANTI!');
-  hud.subtitle('Sab shaant. Ab sab padhai kar rahe hain... aur bijli hai, toh Warden Saab door se dekhte hain. Study circle mein chhupo, ya fuse udaao.', 6);
-  sfx.sting('got');
-}
-// He plants himself in the lobby and glares around, yelling.
-function wardenAtBrawl(dt) {
-  if (warden.mode !== 'errand' || warden.errand?.tag !== 'brawl' || warden.moving) return;
-  warden.yaw = -0.3 + Math.sin(time * 0.8) * 1.3;
-  brawlSayT -= dt;
-  if (brawlSayT <= 0) {
-    brawlSayT = 5 + Math.random() * 3;
-    hud.say(['SAB APNE KAMRE MEIN!', 'Kisne shuru kiya ye?!', 'Ek-ek ka naam likh raha hoon!', 'Bijli aate hi tamasha?!'][Math.floor(Math.random() * 4)], wardenHead, 'angry');
-  }
-}
-function brawlEvent(e) {
-  if (e.type === 'windup') hud.sfx('!', brawlerModels.headOf(e.id), 0.9, 0.5);
-  else if (e.type === 'hit') {
-    const n = moveCircle(map, player.x, player.z, e.kx, e.kz, RADIUS);
-    player.x = n.x; player.z = n.z;
-    shakeT = 0.3;
-    hud.hurt();
-    hud.sfx(POW[Math.floor(Math.random() * POW.length)], v3(player.x - Math.sin(player.yaw) * 0.8, 1.4, player.z - Math.cos(player.yaw) * 0.8), 1.2, 0.6);
-    sfx.punch(true);
-    buzz(50);
-  } else if (e.type === 'whiff') sfx.whoosh();
-  else if (e.type === 'flail') {
-    if (Math.hypot(e.x - player.x, e.z - player.z) < 9) hud.sfx(POW[Math.floor(Math.random() * POW.length)], v3(e.x, 1.6, e.z), 0.7, 0.6);
-  } else if (e.type === 'shout') {
-    if (Math.hypot(e.x - player.x, e.z - player.z) < 10) hud.say(e.line, brawlerHead(e.id), 'angry', 'Student');
-  } else if (e.type === 'playerKO') {
-    koByBrawl = true;
-    brawl.hp = PLAYER_HP * 0.6;
-    getCaught();
-  }
-}
-function punch() {
-  if (punchCd > 0 || !brawl) return;
-  punchCd = 0.45;
-  const heavy = selected(jug) === 'bat';
-  vm.play(heavy ? 'smashHit' : 'punch', heavy ? 0.35 : 0.25, heavy ? { item: 'bat' } : { item: null });
-  for (const e of playerPunch(brawl, player, heavy)) {
-    if (e.type === 'miss') { sfx.whoosh(); continue; }
-    hud.sfx(e.type === 'ko' ? 'K.O.!' : POW[Math.floor(Math.random() * POW.length)], v3(e.x, 1.5, e.z), e.type === 'ko' ? 1.4 : 1, 0.7);
-    sfx.punch(false);
-    if (e.type === 'ko') { buzz(40); hud.toast('💫 Ek dher!'); }
   }
 }
 
@@ -713,7 +617,6 @@ function inventoryKeys() {
     }
   }
   if (input.tapped('KeyV')) throwSelected();
-  if (input.tapped('Punch')) punch();      // the MAARO button on phones
 }
 
 // ---- E: look, act, hold
@@ -725,11 +628,6 @@ function interact(dt, noises) {
   const behind = jug.wardenKeys && warden.mode !== 'chase' && isBehind(warden, player, 1.4);
   if (behind && !jug.seated) target = { type: 'warden', dist: 1, at: { x: warden.x, z: warden.z }, key: 'warden' };
   let actions = target ? actionsFor(jug, target, { dist: target.dist, inside: target.inside, crouch: player.crouch, behind }) : [];
-  // Back in your room with the Maggi: E eats it (unless you are at the door, to shut it first).
-  if (jug.inv.includes('maggi') && inMyRoom(player.x, player.z) && !(target && target.type === 'door' && actions.length)) {
-    target = { type: 'eat', dist: 0, at: { x: player.x, z: player.z }, key: 'eat' };
-    actions = actionsFor(jug, target);
-  }
   if (target && target.type === 'door' && target.door.kind === 'D' && actions[0]?.id === 'toggle' && target.door.open && playerInDoor(target.door)) {
     actions = [];
   }
@@ -761,10 +659,8 @@ function interact(dt, noises) {
     hold.noiseT += dt;
     if (action.noise && hold.noiseT > 1) {
       hold.noiseT = 0;
-      const eating = action.id === 'eat';
-      noises.push({ x: target.at.x, z: target.at.z, r: action.noise, line: eating ? 'Ye slurp-slurp kaun kar raha hai?!' : undefined });
-      hud.sfx(eating ? 'SLURRP' : action.id === 'pickGrill' ? 'khat-khut' : 'khrr', v3(target.at.x, 1.2, target.at.z), 0.6, 0.6);
-      if (eating) sfx.slurp();
+      noises.push({ x: target.at.x, z: target.at.z, r: action.noise });
+      hud.sfx(action.id === 'pickGrill' ? 'khat-khut' : 'khrr', v3(target.at.x, 1.2, target.at.z), 0.6, 0.6);
     }
     if (action.id === 'grabKeys') grabTick(jug, dt, player.crouch);
     // Standing up behind him? He feels it.
@@ -793,18 +689,17 @@ function playerInDoor(door) {
 
 // ---- phone niceties: only the buttons that do something, a glowing USE, buzzes
 const tb = (k) => document.querySelector(`#tbtns [data-key="${k}"]`);
-const TB = isTouch ? { use: tb('KeyE'), torch: tb('KeyF'), throw: tb('KeyV'), combine: tb('KeyG'), drop: tb('KeyQ'), punch: tb('Punch') } : null;
+const TB = isTouch ? { use: tb('KeyE'), torch: tb('KeyF'), throw: tb('KeyV'), combine: tb('KeyG'), drop: tb('KeyQ') } : null;
 let tbKey = '';
 function updateTouchButtons(canUse) {
   if (!TB) return;
   const sel = selected(jug);
   const r = recipeFor(jug);
-  const k = [jug.inv.includes('phone'), sel && ITEMS[sel].props.includes('throw'), r && r.ready, !!sel, canUse, !!brawl].join();
+  const k = [jug.inv.includes('phone'), sel && ITEMS[sel].props.includes('throw'), r && r.ready, !!sel, canUse].join();
   if (k !== tbKey) {
     tbKey = k;
     TB.torch.hidden = !jug.inv.includes('phone');
     TB.throw.hidden = !(sel && ITEMS[sel].props.includes('throw'));
-    TB.punch.hidden = !brawl;
     TB.combine.hidden = !(r && r.ready);
     TB.drop.hidden = !sel;
     TB.use.classList.toggle('ready', canUse);
@@ -816,7 +711,7 @@ function updateMaggiChip() {
   const m = jug.maggi;
   const secs = Math.ceil(m.t);
   const t = m.state === 'cooking' ? `🍜 ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
-    : m.state === 'ready' ? '🍜 READY!' : m.state === 'carried' ? '🍜 HAATH MEIN' : '';
+    : m.state === 'ready' ? '🍜 READY!' : '';
   if (t === chipText) return;
   chipText = t;
   maggiChip.textContent = t;
@@ -874,20 +769,31 @@ function openingPanels() {
   ];
 }
 
-// The winning comic: eating in the dark while he walks past the door.
-function roomPanels() {
-  const show = (v) => () => { plate.visible = v; };
-  const desk = { pos: [3.9, 1.45, 11.9], at: [1.4, 0.8, 9.4] };
-  const p1 = shot({ ...desk, power: 0, lamp: 0.7, setup: show(true) });
-  const p2 = shot({ pos: [2.5, 1.5, 11.3], at: [2.5, 1.0, 8.2], power: 0, lamp: 0.7, setup: show(true) });
-  const p3 = shot({ pos: [2.35, 1.12, 10.15], at: [1.6, 0.8, 9.45], fov: 40, power: 0, lamp: 1.0, setup: show(true) });
-  const p4 = shot({ pos: [2.5, 1.5, 11.3], at: [2.5, 1.0, 8.2], power: 0, lamp: 0.7, setup: show(true) });
-  plate.visible = false;
+// The ending (as pitched): your Maggi is ready... and Warden Saab is already
+// at the counter, eating. He looks up, and pushes a plate over.
+function endingPanels() {
+  const lanternWas = world.lantern.intensity;
+  const pose = (look, pushed) => () => {
+    world.lantern.intensity = 4.5;
+    wardenModel.group.visible = false;
+    readyBowl.visible = false;
+    cutWarden.group.visible = true;
+    cutWarden.update({ x: 36.15, z: 17.6, yaw: 0, lookOffset: look, moving: false, mode: 'patrol', meter: 0 }, 0);
+    bowls.forEach((b) => { b.visible = true; });
+    bowls[1].position.set(pushed ? 35.2 : 35.5, 0.95, pushed ? 18.15 : 18.35);
+  };
+  const p1 = shot({ pos: [36.0, 1.65, 14.4], at: [36, 1.3, 18.3], setup: pose(0, false) });
+  const p2 = shot({ pos: [33.9, 1.55, 16.4], at: [36.1, 1.2, 18.0], fov: 50, setup: pose(0, false) });
+  const p3 = shot({ pos: [35.0, 1.55, 16.2], at: [36.1, 1.55, 17.6], fov: 40, setup: pose(-2, false) });
+  const p4 = shot({ pos: [34.8, 1.6, 16.6], at: [35.7, 1.15, 17.9], fov: 50, setup: pose(-1.6, true) });
+  cutWarden.group.visible = false;
+  bowls.forEach((b) => { b.visible = false; });
+  world.lantern.intensity = lanternWas;
   return [
-    { img: p1, dim: false, caption: 'Room 106. Darwaza band. Torch band.', sfx: { text: 'SLURRRP', x: 56, y: 40, rot: -8 }, bubbles: [{ text: 'Zindagi ka sabse lamba ek minute tha...', x: 46, y: 10 }] },
-    { img: p2, dim: true, caption: 'Bahar... chappal ki awaaz.', sfx: { text: 'thap... thap...', x: 8, y: 72, rot: 4 }, bubbles: [{ text: 'Hmm... ye Maggi ki khushboo...?', x: 36, y: 14, shout: true }] },
-    { img: p3, caption: 'Saans roko.', bubbles: [{ text: '.....', x: 60, y: 12 }] },
-    { img: p4, dim: true, caption: 'Maggi ke liye... KUCH BHI.', sfx: { text: 'BURRRP!', x: 12, y: 60, rot: -10 }, bubbles: [{ text: 'Chooha hoga. Hmph.', x: 40, y: 14, shout: true }] },
+    { img: p1, caption: 'Maggi ready. Finally.', bubbles: [{ text: 'Bhaiya! Meri Maggi, DOUBLE masala!', x: 8, y: 14, shout: true }] },
+    { img: p2, caption: 'Counter pe pehle se koi baitha hai...', sfx: { text: 'SLURRRRP', x: 50, y: 30, rot: -10 } },
+    { img: p3, caption: 'Woh. Yahan. Bhi.', bubbles: [{ text: '.....', x: 56, y: 12 }] },
+    { img: p4, caption: 'Warden Saab ne plate aage sarkaayi.', bubbles: [{ text: 'Paper kal hai na? Jaldi kha, phir so ja.', x: 30, y: 10 }] },
   ];
 }
 
@@ -930,7 +836,6 @@ function frame() {
 function tick(dt) {
   time += dt;
   resize();
-  punchCd = Math.max(0, punchCd - dt);
 
   if (state === 'playing') {
     const torchWas = player.torch;
@@ -940,18 +845,10 @@ function tick(dt) {
       player.crouch = false;
     }
     if (input.tapped('KeyP', 'Escape') || (isTouch && portrait.matches)) { pause(); input.endFrame(); return; }
-    const carrying = jug.inv.includes('maggi');
-    if (carrying && input.tapped('ShiftLeft', 'ShiftRight')) hud.subtitle('Garam Maggi leke bhaagoge? Gir jayegi!', 2);
-    const noises = updatePlayer(player, dt, input, map, 0.0022 * sensitivity, { noRun: carrying });
-    // The smell of Maggi travels: he notices it if he gets close.
-    if (carrying) {
-      smellT -= dt;
-      if (smellT <= 0) { smellT = 1; noises.push({ x: player.x, z: player.z, r: SMELL_R, line: 'Ye... Maggi ki khushboo?!' }); }
-    }
+    const noises = updatePlayer(player, dt, input, map, 0.0022 * sensitivity);
     // The stall's lantern lights you up; indoors the tube lights do (when the power is on).
     player.lit = Math.hypot(player.x - 36, player.z - 18.2) < 3.3;
     player.inRoom = inMyRoom(player.x, player.z);
-    player.hasMaggi = carrying;
     warden.lightsOn = jug.power.on && warden.z < 13.2 && player.z < 13.2;
     if (warden.lightsOn !== torchAway) { torchAway = warden.lightsOn; wardenModel.setTorch(!torchAway); }
     if (jug.seated) {
@@ -976,19 +873,10 @@ function tick(dt) {
     if (state !== 'playing') { input.endFrame(); return; }   // the last bite just won the game
     updateTouchButtons(canUseNow);
 
-    // The brawl: fists flying, hide in the crowd, ten quiet seconds in your room.
-    if (brawl) {
-      player.cover = crowdCover(brawl, warden.x, warden.z, player.x, player.z);
-      for (const e of updateBrawl(brawl, dt, player, map)) brawlEvent(e);
-      if (state !== 'playing') { input.endFrame(); return; }
-      wardenAtBrawl(dt);
-      if (tickCalm(brawl, dt, player)) endBrawl();
-    } else player.cover = 0;
-
     // Slipping through the grill while he holds it open.
     const grill = map.doors.get('25,6');
     if (prevX < 25 && prevX > 24 && player.x >= 25 && player.z > 6 && player.z < 8) {
-      if (grill.locked) tailgated(jug); else if (!jug.solved.grill) crossedOpenGrill(jug);
+      if (grill.locked) tailgated(jug);
     }
     prevX = player.x;
     // ...and through the main gate the same way.
@@ -1000,7 +888,7 @@ function tick(dt) {
     prevZ = player.z;
 
     // His checks on Room 106. Out of bed when he looks in? He starts hunting you.
-    if (!map.doors.get(MY_DOOR).locked && !tutorial.active && !brawl) {
+    if (!map.doors.get(MY_DOOR).locked && !tutorial.active) {
       if (!checksStarted && !player.inRoom) { checksStarted = true; roomCheckT = ROOM_CHECK.first; }
       if (checksStarted) {
         roomCheckT -= dt;
@@ -1016,8 +904,7 @@ function tick(dt) {
       }
     }
 
-    // The lights come back when you cross the grill, or at 2:00 AM regardless.
-    if (jug.act === 1 && (jug.solved.grill || minutes >= BRAWL_AT)) handle(startAct2(jug), noises);
+    if (jug.solved.grill && jug.act === 1) handle(startAct2(jug), noises);
     handle(updateJugaad(jug, dt, { player, warden }), noises);
     chowkidarHears(jug, noises);
 
@@ -1093,9 +980,7 @@ function tick(dt) {
 
   // camera
   const bob = player.moving ? Math.sin(player.bob) * (player.running ? 0.05 : 0.025) : 0;
-  shakeT = Math.max(0, shakeT - dt);
-  const sh = shakeT * 0.12;
-  camera.position.set(player.x + (Math.random() - 0.5) * sh, player.eye + bob + (Math.random() - 0.5) * sh, player.z + (Math.random() - 0.5) * sh);
+  camera.position.set(player.x, player.eye + bob, player.z);
   camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
   if (window.__debugCam) {           // dev only: look from anywhere
     camera.position.set(...window.__debugCam.pos);
@@ -1118,9 +1003,6 @@ function tick(dt) {
   world.update(dt);
   hud.setMeter(warden.meter, warden.mode);
   hud.setChances(CHANCES - caughtCount, CHANCES);
-  brawlerModels.update(dt, brawl);
-  hud.setDum(brawl ? brawl.hp / PLAYER_HP : null);
-  hud.setCalm(brawl && player.inRoom ? Math.max(0, CALM_TIME - brawl.calm) : null);
   hud.setStatus({ minutes, areaName: areaName(player.x, player.z), torch: player.torch, crouch: player.crouch, running: player.running });
   hud.setInventory(jug, recipeFor(jug));
   hud.setHold(hold ? hold.t / hold.action.hold : 0);
@@ -1140,4 +1022,4 @@ window.__game = {
   step(seconds) { for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60); },
   get minutes() { return minutes; }, set minutes(m) { minutes = m; },
   get roomCheckT() { return roomCheckT; }, set roomCheckT(v) { roomCheckT = v; },
-  get brawl() { return brawl; }, get state() { return state; }, set state(s) { state = s; } };
+  get state() { return state; }, set state(s) { state = s; } };

@@ -243,22 +243,4 @@ function music() {
 export function suspend() { ctx?.suspend(); }
 export function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
 
-// Eating noodles as quietly as you can (which is not very).
-export function slurp() {
-  if (!ctx) return;
-  const o = out(0, 0.7);
-  for (let i = 0; i < 3; i++) noiseBurst(o, { dur: 0.12, freq: 1800 - i * 400, q: 4, vol: 0.4, at: i * 0.09 });
-}
 
-// The brawl: punches landing (heavier when it's you getting hit), and misses.
-export function punch(onYou) {
-  if (!ctx) return;
-  const o = out(0, 1);
-  noiseBurst(o, { dur: 0.12, freq: onYou ? 240 : 380, q: 0.8, vol: onYou ? 1 : 0.7, type: 'lowpass' });
-  tone(o, { f0: onYou ? 120 : 170, f1: 50, dur: 0.15, type: 'sine', vol: 0.4 });
-}
-export function whoosh() {
-  if (!ctx) return;
-  const o = out(0, 0.5);
-  noiseBurst(o, { dur: 0.18, freq: 1200, q: 0.6, vol: 0.4 });
-}

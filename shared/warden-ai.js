@@ -82,8 +82,8 @@ export function sightRate(w, p, map) {
   const torchYaw = w.yaw + w.lookOffset;
   const off = Math.abs(angleDiff(yawTo(dx, dz), torchYaw));
   const bodyOff = Math.abs(angleDiff(yawTo(dx, dz), w.yaw));
-  // In your own room you are where you should be (unless there's Maggi in your hands).
-  if (p.inRoom && !p.hasMaggi) return 0;
+  // In your own room you are where you should be.
+  if (p.inRoom) return 0;
   // Sitting in a study circle with a book: just another student cramming.
   if (p.hidden && w.mode !== 'chase' && dist > 1.2) return 0;
   if (!lineOfSight(map, w.x, w.z, p.x, p.z, { targetCrouched: p.crouch })) return 0;
@@ -95,7 +95,7 @@ export function sightRate(w, p, map) {
     if (bodyOff < LIT_FOV * k(w, 'fov')) rate = 0.35 + 1.4 * Math.max(0, 1 - dist / R) ** 1.3;
     else if (dist < 2.5 && bodyOff < 1.9) rate = 0.9;
     if (p.crouch) rate *= 0.75;
-    return rate * k(w, 'rate') * (1 - (p.cover || 0));
+    return rate * k(w, 'rate');
   }
   if (off < BEAM_HALF_ANGLE + 0.04 && dist < BEAM_RANGE * k(w, 'range')) {
     rate = 0.25 + 1.4 * Math.max(0, 1 - dist / (12 * k(w, 'range'))) ** 2;   // caught in his beam
@@ -105,7 +105,7 @@ export function sightRate(w, p, map) {
     rate = 0.9;                                                               // right under his nose
   }
   if (p.crouch && !p.torch) rate *= 0.6;
-  return rate * k(w, 'rate') * (1 - (p.cover || 0));
+  return rate * k(w, 'rate');
 }
 
 // The closest cell he can actually stand in (noises come from beds, chairs...).

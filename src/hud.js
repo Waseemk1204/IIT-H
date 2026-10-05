@@ -13,8 +13,6 @@ export function createHud() {
   const inv = $('inventory'), invInfo = $('inv-info'), holdEl = $('hold'), toasts = $('toasts'), pop = $('bigpop');
   let lastPrompt = '', lastInv = '', lastObjective = '', lastChances = -1;
   const chances = $('chances');
-  const dum = $('dum'), dumFill = $('dum-fill'), hurtEl = $('hurt'), calmEl = $('calm');
-  let lastCalm = '';
   const tutEl = $('tutorial'), tutStep = $('tut-step'), tutText = $('tut-text');
   let lastTut = '';
   const objective = $('objective');
@@ -87,19 +85,6 @@ export function createHud() {
     },
     tutorialTick() {
       tutEl.classList.remove('tick'); void tutEl.offsetWidth; tutEl.classList.add('tick');
-    },
-    // The brawl: your health bar, a red flash when hit, the calm-down count.
-    setDum(f) {
-      dum.classList.toggle('show', f !== null);
-      if (f !== null) { dumFill.style.width = `${Math.round(f * 100)}%`; dum.classList.toggle('low', f < 0.3); }
-    },
-    hurt() { hurtEl.classList.remove('go'); void hurtEl.offsetWidth; hurtEl.classList.add('go'); },
-    setCalm(left) {
-      const t = left === null ? '' : `SHAANT RAHO... ${Math.ceil(left)}`;
-      if (t === lastCalm) return;
-      lastCalm = t;
-      calmEl.textContent = t;
-      calmEl.classList.toggle('show', !!t);
     },
     setChances(left, total) {
       if (left === lastChances) return;

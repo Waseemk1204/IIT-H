@@ -23,7 +23,6 @@ export const ITEMS = {
   kettle:    { name: 'Electric kettle', icon: '🫖', props: ['appliance'], hint: 'Bahut current kheenchti hai...' },
   iron:      { name: 'Press (iron)', icon: '👔', props: ['appliance'], hint: 'Kisi ki shirt press karne waala tha.' },
   heater:    { name: 'Room heater', icon: '🔥', props: ['appliance'], hint: "Warden Saab ka 'personal' heater." },
-  maggi:     { name: 'Garma garam Maggi', icon: '🍜', props: ['maggi'], hint: 'Room 106 mein le jao. Bhaago mat, garam hai! Khushboo bhi aati hai...' },
 };
 
 export const RECIPES = [
@@ -86,8 +85,6 @@ export const BOARD = { x: 33.5, z: 4.5, cell: '33,4' };
 export const FUSE_BOX = { x: 36.5, z: 1.5 };     // in the warden's room
 export const POWER_FALLBACK = 60;                 // seconds until someone fixes it anyway
 export const MAGGI_TIME = 60;                     // one real minute
-export const SMELL_R = 3.2;                       // how close he has to be to smell it
-export const EAT_TIME = 6;
 
 // Find every container: runs of beds, tables and almirahs.
 function findContainers(map) {
@@ -141,7 +138,7 @@ export function createJugaad(map) {
     power: { on: false, tripped: false, offT: 0 },
     plugged: [],                // appliances in the extension board
     seated: null,               // the study circle you are pretending in
-    maggi: { state: 'none', t: 0 },   // none -> cooking -> ready -> carried -> eaten
+    maggi: { state: 'none', t: 0 },   // none -> cooking -> ready -> done
     wardenKeys: true,           // his key bunch is on his belt (until you pick his pocket)
     circleByCell: new Map(),
   };
@@ -237,9 +234,7 @@ export function actionsFor(st, target, ctx = {}) {
   } else if (target.type === 'counter') {
     const m = st.maggi;
     if (m.state === 'none') A.push({ id: 'order', label: 'Bhaiya, ek plate Maggi!', hold: 0 });
-    else if (m.state === 'ready') A.push({ id: 'takeMaggi', label: 'Maggi utha lo', hold: 0.6 });
-  } else if (target.type === 'eat') {
-    if (has(st, 'maggi')) A.push({ id: 'eat', label: 'Chupke se Maggi khao', hold: EAT_TIME, noise: 4.5, uses: 'maggi' });
+    else if (m.state === 'ready') A.push({ id: 'takeMaggi', label: 'Meri Maggi, Bhaiya!', hold: 0 });
   } else if (target.type === 'warden') {
     if (st.wardenKeys && ctx.behind) A.push({ id: 'pickpocket', label: 'Peeche se... Warden Saab ki chaabi nikalo', hold: 2 });
   } else if (target.type === 'chowkidar') {
@@ -291,8 +286,6 @@ export function lockedHint(st, target) {
   if (target.type === 'counter') {
     const m = st.maggi;
     if (m.state === 'cooking') return `Ban rahi hai... ${Math.ceil(m.t)} sec. Yahan lantern ki roshni hai. Chhup jao!`;
-    if (m.state === 'carried') return 'Maggi haath mein hai. Ab Room 106!';
-    if (m.state === 'eaten') return 'Pet bhar gaya.';
   }
   if (target.type !== 'door') return null;
   const d = target.door;
@@ -465,26 +458,14 @@ export function perform(st, target, action, ctx = {}) {
     }
     case 'order': {
       st.maggi = { state: 'cooking', t: MAGGI_TIME };
-      // He went out to do his rounds and left the grill open behind him.
-      for (const d of map.doors.values()) if (d.kind === 'G') { d.locked = false; d.open = true; d.byWarden = false; }
       ev.push({ type: 'say', who: 'bhaiya', line: 'Ek minute! Bas ek minute...' });
       ev.push({ type: 'act3' });
       break;
     }
     case 'takeMaggi': {
-      if (st.inv.length >= INV_CAP) { msg('Jeb bhar gayi! Kuch girao (Q), phir Maggi uthao.'); break; }
-      st.inv.push('maggi');
-      st.sel = st.inv.length - 1;
-      st.maggi.state = 'carried';
-      ev.push({ type: 'got', items: ['maggi'] });
-      ev.push({ type: 'say', who: 'bhaiya', line: 'Dhyaan se, garam hai! Paise kal dena.' });
-      ev.push({ type: 'carrying' });
-      break;
-    }
-    case 'eat': {
-      removeItem(st, 'maggi');
-      st.maggi.state = 'eaten';
-      solve(st, 'eat', 'sneaky', 'Room 106 mein chupke se Maggi kha li');
+      // The end: and the final twist is waiting at the counter (see the ending comic).
+      st.maggi.state = 'done';
+      solve(st, 'maggi', 'sneaky', 'Ek minute chhupe rahe, Maggi tak pahunche');
       ev.push({ type: 'won' });
       break;
     }
@@ -553,11 +534,6 @@ export function canOpen(st, which) {
   if (which === 'grill') return has(st, 'pick') || has(st, 'heavy') || has(st, 'keyGrill');
   if (which === 'main') return has(st, 'keyMain') || has(st, 'heavy') || has(st, 'longhook');
   return true;
-}
-
-// Walked through the grill while the brawl had it flung open.
-export function crossedOpenGrill(st) {
-  solve(st, 'grill', 'sneaky', 'Jhagde mein khule grill se nikal gaye');
 }
 
 // Slipped out through the main gate while he had it open.
@@ -700,13 +676,6 @@ export const WARDEN_ALMIRAH = '35,1';
 export function confiscateWorldItem(st, w) {
   st.worldItems = st.worldItems.filter((x) => x !== w);
   st.containers.get(WARDEN_ALMIRAH).items.push(w.item);
-}
-// Caught with the Maggi? It's gone (he eats it), and you have to order again.
-export function loseMaggi(st) {
-  if (!st.inv.includes('maggi')) return false;
-  removeItem(st, 'maggi');
-  st.maggi = { state: 'none', t: 0 };
-  return true;
 }
 export function confiscateHeld(st) {
   const id = selected(st);

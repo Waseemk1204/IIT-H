@@ -79,14 +79,14 @@ test("the main gate key is not only the chowkidar's: a spare in his desk, and hi
   assert.ok(st2.inv.includes('masterkey'), 'you keep the key after unlocking');
 });
 
-test('in your own room he leaves you be, unless you have the Maggi', () => {
+test('in your own room he leaves you be', () => {
   const map = createMap();
   map.doors.get('2,8').open = true;
   const w = createWarden(map, { x: 2.5, z: 7.6 }, WARDEN_ROUTE);
   w.yaw = 0; w.lookOffset = 0;
   const me = { x: 2.5, z: 10.5, crouch: false, torch: true, inRoom: true };
   assert.equal(sightRate(w, me, map), 0);
-  assert.ok(sightRate(w, { ...me, hasMaggi: true }, map) > 0);
+  assert.ok(sightRate(w, { ...me, inRoom: false }, map) > 0);
 });
 
 test('only from behind his back', () => {
@@ -123,4 +123,21 @@ test('your room check: he walks in and back out, shutting the door behind him', 
     run(w, 6, out);
     assert.equal(map.doors.get('2,8').open, false, 'door shut behind him');
   });
+});
+
+test('difficulty scales the warden and the chances; taking everything is Warden Mode only', async () => {
+  const { DIFFICULTY, getDifficulty } = await import('../shared/difficulty.js');
+  const map = createMap();
+  const p = { x: 12, z: 6.5, crouch: false, torch: false };
+  const rates = ['easy', 'normal', 'hard'].map((id) => {
+    const w = createWarden(map, { x: 2.5, z: 6.5 }, []);
+    w.diff = DIFFICULTY[id].warden; w.lightsOn = true; w.yaw = yawTo(1, 0);
+    return sightRate(w, p, map);
+  });
+  assert.ok(rates[0] < rates[1] && rates[1] < rates[2], rates.join(' < '));
+  assert.ok(DIFFICULTY.easy.chances > DIFFICULTY.normal.chances && DIFFICULTY.normal.chances > DIFFICULTY.hard.chances);
+  assert.equal(DIFFICULTY.easy.confiscate, 'held');
+  assert.equal(DIFFICULTY.normal.confiscate, 'held');
+  assert.equal(DIFFICULTY.hard.confiscate, 'all');
+  assert.equal(getDifficulty('nonsense').id, 'normal');
 });
