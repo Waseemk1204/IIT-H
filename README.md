@@ -98,8 +98,8 @@ in detention, writing "Lights off = SONA" until 6 AM while he eats your Maggi.
 **At the stall:** order (before 3 AM). Maggi takes one real minute, and while it cooks
 Warden Saab does his rounds out in the compound and stops at the stall for chai, and the
 stall's lantern lights up anyone waiting at the counter: hide in the dark. Bhaiya shouts
-when it's ready. Go claim it... and the final twist is waiting at the counter. Then the score
-card: improvised answers beat sneaky ones, which beat keys, which beat brute force.
+when it's ready. Claim it and slip behind the stall to eat... and watch who walks up to order
+a plate for himself (the final twist, told from your hiding spot). Then the score card: improvised answers beat sneaky ones, which beat keys, which beat brute force.
 
 **Phase 3 (done):** the twist. Get through the grill gate and the power comes back: tube
 lights stutter on, fans spin up, the whole block cheers, and students pour into the corridor

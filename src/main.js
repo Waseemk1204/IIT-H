@@ -462,7 +462,7 @@ async function win() {
   jug.seated = null;
   document.exitPointerLock?.();
   sfx.setTension(0);
-  if (!window.__skipComics) await playComic(endingPanels(), { title: 'Maggi Point, raat ke 2 baje ke baad...' });
+  if (!window.__skipComics) await playComic(endingPanels(), { title: 'Maggi Point ke peeche...' });
   state = 'won';
   const left = Math.max(0, Math.floor(CLOSING - orderedAt));
   if (left > 0) jug.log.push({ text: `Band hone se ${left} minute pehle order diya`, kind: 'time', points: left * 4 });
@@ -769,31 +769,49 @@ function openingPanels() {
   ];
 }
 
-// The ending (as pitched): your Maggi is ready... and Warden Saab is already
-// at the counter, eating. He looks up, and pushes a plate over.
+// The ending, from where you're hiding: crouched behind the stall with your
+// plate, you watch Warden Saab walk up and order his own Maggi... and then he
+// finds you. (The proposal's twist and line, told from your side.)
+const endPlate = makeItemModel('maggi');
+endPlate.scale.setScalar(2.2);
+endPlate.position.set(33.05, 0.02, 19.55);
+endPlate.visible = false;
+scene.add(endPlate);
 function endingPanels() {
   const lanternWas = world.lantern.intensity;
-  const pose = (look, pushed) => () => {
+  // stand the stand-in warden somewhere, facing a point; walking = mid-stride
+  const at = (x, z, faceX, faceZ, walking = false, look = 0) => () => {
     world.lantern.intensity = 4.5;
     wardenModel.group.visible = false;
     readyBowl.visible = false;
+    endPlate.visible = true;
     cutWarden.group.visible = true;
-    cutWarden.update({ x: 36.15, z: 17.6, yaw: 0, lookOffset: look, moving: false, mode: 'patrol', meter: 0 }, 0);
-    bowls.forEach((b) => { b.visible = true; });
-    bowls[1].position.set(pushed ? 35.2 : 35.5, 0.95, pushed ? 18.15 : 18.35);
+    cutWarden.update({ x, z, yaw: Math.atan2(faceX - x, faceZ - z), lookOffset: look, moving: walking, mode: 'patrol', meter: 0 }, walking ? 0.25 : 0);
   };
-  const p1 = shot({ pos: [36.0, 1.65, 14.4], at: [36, 1.3, 18.3], setup: pose(0, false) });
-  const p2 = shot({ pos: [33.9, 1.55, 16.4], at: [36.1, 1.2, 18.0], fov: 50, setup: pose(0, false) });
-  const p3 = shot({ pos: [35.0, 1.55, 16.2], at: [36.1, 1.55, 17.6], fov: 40, setup: pose(-2, false) });
-  const p4 = shot({ pos: [34.8, 1.6, 16.6], at: [35.7, 1.15, 17.9], fov: 50, setup: pose(-1.6, true) });
+  const crouch = 0.95;
+  const glow = { lamp: 1.6, lampAt: [32.9, 1.6, 19.8] };     // the lantern's spill behind the stall
+  const p1 = shot({ pos: [32.55, crouch + 0.1, 20.25], at: [33.1, 0.2, 19.4], fov: 52, ...glow, setup: at(30, 13.2, 30, 20) });
+  const p2 = shot({ pos: [31.5, crouch + 0.05, 19.35], at: [31.2, 1.25, 15.3], fov: 50, ...glow, setup: at(31.2, 15.4, 31.5, 19.3, true) });
+  const p3 = shot({ pos: [32.35, crouch, 19.45], at: [36.1, 1.35, 17.6], fov: 45, setup: () => {
+    at(36.15, 17.55, 36.2, 18.5)();
+    bowls[0].visible = true; bowls[0].position.set(36.15, 0.95, 18.3);
+  } });
+  const p4 = shot({ pos: [32.65, crouch, 19.75], at: [31.65, 1.55, 18.55], fov: 50, ...glow, setup: () => {
+    at(31.55, 18.5, 32.65, 19.75, false, 0)();
+    bowls[0].visible = false;
+  } });
   cutWarden.group.visible = false;
+  endPlate.visible = false;
   bowls.forEach((b) => { b.visible = false; });
   world.lantern.intensity = lanternWas;
   return [
-    { img: p1, caption: 'Maggi ready. Finally.', bubbles: [{ text: 'Bhaiya! Meri Maggi, DOUBLE masala!', x: 8, y: 14, shout: true }] },
-    { img: p2, caption: 'Counter pe pehle se koi baitha hai...', sfx: { text: 'SLURRRRP', x: 50, y: 30, rot: -10 } },
-    { img: p3, caption: 'Woh. Yahan. Bhi.', bubbles: [{ text: '.....', x: 56, y: 12 }] },
-    { img: p4, caption: 'Warden Saab ne plate aage sarkaayi.', bubbles: [{ text: 'Paper kal hai na? Jaldi kha, phir so ja.', x: 30, y: 10 }] },
+    { img: p1, caption: 'Stall ke peeche. Chupke se.', sfx: { text: 'SLURRRP', x: 52, y: 52, rot: -8 }, bubbles: [{ text: 'Aah... zindagi.', x: 8, y: 14 }] },
+    { img: p2, caption: 'Phir... chappal ki awaaz.', sfx: { text: 'thap... thap...', x: 8, y: 70, rot: 4 }, bubbles: [{ text: 'Uh-oh.', x: 58, y: 12 }] },
+    { img: p3, caption: '...aur khud order kar diya?!', bubbles: [
+      { text: 'Bhaiya, ek plate Maggi. Double masala!', x: 30, y: 8 },
+      { text: 'Abhi lo, Saab!', x: 66, y: 46 },
+    ] },
+    { img: p4, caption: 'Pakde gaye. Maggi ke saath.', sfx: { text: '!', x: 70, y: 20, rot: 6 }, bubbles: [{ text: 'Tum bhi?! ...Paper kal hai na? Jaldi kha, phir so ja.', x: 4, y: 58 }] },
   ];
 }
 
