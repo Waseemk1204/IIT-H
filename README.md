@@ -29,6 +29,14 @@ npm test
 
 runs the tests for the map, collision, line of sight and the warden's AI.
 
+```bash
+npm run build
+```
+
+packs just the playable files into `dist/maggie-ke-liye-kuch-bhi-web.zip` for itch.io /
+IndieConnect (index.html at the root). The store-page text, upload settings, cover and
+screenshots are in [`itch/`](itch/STORE-PAGE.md).
+
 **First time?** A short tutorial runs inside Room 106: look, walk, torch, search, pick an
 item, and get through your locked door (a yellow arrow points at what to use, and the clock
 waits until you are out). Then a few stealth tips. Press T (or Skip) to skip it; the pause
@@ -140,6 +148,7 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | `src/cutscenes.js` | Comic-page cutscenes built from engine-rendered panels |
 | `src/input.js` | Keyboard, mouse, and the phone joystick, look-drag and buttons |
 | `src/tutorial.js` | The first-room tutorial: steps that finish when you do the thing |
+| `tools/build-web.mjs` | Packs the game into the itch.io zip |
 | `shared/difficulty.js` | The three difficulty levels and everything they scale |
 | `src/main.js` | Renderer, the game loop, and the glue between player, warden and HUD |
 | `src/player.js` | First-person movement, crouch, run, footstep noise |
@@ -166,3 +175,4 @@ a pause menu with sensitivity, controls and restart; an icon and web manifest.
 | 3 Oct 2026 | Claude Code (Anthropic) | First-room tutorial with step cards, a 3D pointer arrow, clock freeze, skip and replay. |
 | 5 Oct 2026 | Claude Code (Anthropic) | Difficulty pass: sharper lights-on sight, Room 106 checks and hunt mode, the warden shuts and relocks doors and gates, master key and desk key, confiscate-all on catch, 12-minute clock, tests. |
 | 5 Oct 2026 | Claude Code (Anthropic) | Difficulty selector. (A lights-on brawl and a carry-it-home ending were tried and removed to stay within the proposal's premise.) |
+| 6 Oct 2026 | Claude Code (Anthropic) | Final review fixes (phone never confiscated as a held item, proposal's 'Curfew Ka Baap' title, dead code), web build script, store-page text, cover and screenshots rendered from the game. |

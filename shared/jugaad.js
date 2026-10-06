@@ -2,7 +2,6 @@
 // and every way through each lock. Items have properties, not jobs: a lock
 // asks for "something thin" or "something heavy", never for one item.
 // Pure logic (no Three.js) so the tests can prove every lock has 2+ ways.
-import { doorAt } from './map.js';
 
 export const ITEMS = {
   phone:     { name: 'Phone', icon: '📱', props: ['light', 'alarm'], hint: 'F: torch. Q: alarm laga ke yahin rakh do.' },
@@ -70,7 +69,6 @@ export const OCCUPIED = ['7,5', '17,5', '7,8', '17,8'];
 export const MY_DOOR = '2,8';
 export const CHOWKIDAR = { x: 34.5, z: 12.5 };
 export const RADIO = { x: 28.5, z: 1.5, cells: ['28,1', '29,1'] };
-export const CANTEEN = { x: 36, z: 18.5, r: 2.6 };
 
 // Act 2: where students sit and cram once the power is back. Each circle
 // takes up `cells`; you sit at `seat`, facing `yaw` (camera yaw).
@@ -546,8 +544,6 @@ export function tailgated(st) {
   solve(st, 'grill', 'sneaky', 'Warden Saab ke peeche-peeche grill se nikal gaye');
 }
 
-// Called while you hold E on a hold action: some jobs make noise as you go.
-export function holdNoise(action) { return action.noise || 0; }
 
 // ---------- the world ticking along ----------
 // Returns events (noises, speech, sfx). `warden` is read and may confiscate.
@@ -677,9 +673,10 @@ export function confiscateWorldItem(st, w) {
   st.worldItems = st.worldItems.filter((x) => x !== w);
   st.containers.get(WARDEN_ALMIRAH).items.push(w.item);
 }
+// The item in your right hand. Your phone lives in your left (it's your torch), so it stays.
 export function confiscateHeld(st) {
   const id = selected(st);
-  if (!id) return null;
+  if (!id || id === 'phone') return null;
   removeItem(st, id);
   st.containers.get(WARDEN_ALMIRAH).items.push(id);
   return id;
@@ -697,9 +694,7 @@ export function score(st, caught) {
   const lines = [...st.log];
   if (caught) lines.push({ text: `Pakde gaye x${caught}`, kind: 'caught', points: -50 * caught });
   const total = lines.reduce((s, l) => s + l.points, 0);
-  const title = total >= 950 ? 'JUGAAD KA BAAP' : total >= 750 ? 'Maggi Mastermind' : total >= 500 ? 'Hostel Ninja' : total >= 250 ? 'Senior-in-training' : 'Fresher';
+  const title = total >= 950 ? 'CURFEW KA BAAP' : total >= 750 ? 'Maggi Mastermind' : total >= 500 ? 'Hostel Ninja' : total >= 250 ? 'Senior-in-training' : 'Fresher';
   return { lines, total, title };
 }
 
-export function doorKeyOf(door) { return `${door.x},${door.z}`; }
-export { doorAt };

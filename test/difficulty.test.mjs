@@ -141,3 +141,14 @@ test('difficulty scales the warden and the chances; taking everything is Warden 
   assert.equal(DIFFICULTY.hard.confiscate, 'all');
   assert.equal(getDifficulty('nonsense').id, 'normal');
 });
+
+test('a catch on Aasaan / Theek-thaak takes only what is in your right hand, never the phone', async () => {
+  const { confiscateHeld } = await import('../shared/jugaad.js');
+  const st = createJugaad(createMap());
+  st.sel = 0;                                         // phone selected: right hand is empty
+  assert.equal(confiscateHeld(st), null);
+  assert.ok(st.inv.includes('phone'));
+  st.inv.push('bat'); st.sel = 1;
+  assert.equal(confiscateHeld(st), 'bat');
+  assert.ok(st.containers.get('35,1').items.includes('bat'));
+});

@@ -9,7 +9,7 @@ import {
   startAct2, restorePower, STUDY_CIRCLES, FUSE_BOX,
 } from '../shared/jugaad.js';
 import { createStudents } from './render/students.js';
-import { getDifficulty, DIFFICULTY } from '../shared/difficulty.js';
+import { getDifficulty } from '../shared/difficulty.js';
 import { playComic } from './cutscenes.js';
 import { createTutorial } from './tutorial.js';
 import { buildWorld } from './render/world.js';
@@ -790,7 +790,10 @@ function endingPanels() {
   };
   const crouch = 0.95;
   const glow = { lamp: 1.6, lampAt: [32.9, 1.6, 19.8] };     // the lantern's spill behind the stall
-  const p1 = shot({ pos: [32.55, crouch + 0.1, 20.25], at: [33.1, 0.2, 19.4], fov: 52, ...glow, setup: at(30, 13.2, 30, 20) });
+  const p1 = shot({ pos: [32.55, crouch + 0.1, 20.25], at: [33.1, 0.2, 19.4], fov: 52, ...glow, setup: () => {
+    at(31.2, 15.4, 31.5, 19.3)();
+    cutWarden.group.visible = false;                // not here yet
+  } });
   const p2 = shot({ pos: [31.5, crouch + 0.05, 19.35], at: [31.2, 1.25, 15.3], fov: 50, ...glow, setup: at(31.2, 15.4, 31.5, 19.3, true) });
   const p3 = shot({ pos: [32.35, crouch, 19.45], at: [36.1, 1.35, 17.6], fov: 45, setup: () => {
     at(36.15, 17.55, 36.2, 18.5)();
@@ -888,7 +891,7 @@ function tick(dt) {
     noises.push(...pendingNoises.splice(0));
     inventoryKeys();
     interact(dt, noises);
-    if (state !== 'playing') { input.endFrame(); return; }   // the last bite just won the game
+    if (state !== 'playing') { input.endFrame(); return; }   // claiming the Maggi just ended the game
     updateTouchButtons(canUseNow);
 
     // Slipping through the grill while he holds it open.

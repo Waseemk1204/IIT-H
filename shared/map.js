@@ -41,7 +41,6 @@ export const ROWS = [
 export const WALL_H = 3;
 export const LOW = new Set(['b', 't', 's', 'Q', 'k', 'E']);
 export const TALL = new Set(['#', 'c', 'T']);
-export const GATES = new Set(['G', 'M']);
 
 // Where Warden Saab walks, in cell coordinates, with how long he stops and
 // which way he looks while stopped (yaw, radians; 0 = facing +z / south).
